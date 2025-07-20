@@ -1,2 +1,5 @@
-celeste/
+celeste/*
+!celeste/Mods
+celeste/Mods/*
+!celeste/Mods/DiscordPlaysCeleste
 olympus/

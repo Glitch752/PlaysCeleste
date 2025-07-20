@@ -1,4 +1,4 @@
-- Name: mod
+- Name: DiscordPlaysCeleste
   Version: 0.1.0
   DLL: bin/mod.dll
   Dependencies:
