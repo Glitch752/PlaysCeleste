@@ -2,7 +2,7 @@
 
 set -m
 
-curl https://dev.azure.com/EverestAPI/Olympus/_apis/build/builds/4923/artifacts?artifactName=linux.main&api-version=5.0&%24format=zip --output olympus.zip
+curl "https://dev.azure.com/EverestAPI/Olympus/_apis/build/builds/4923/artifacts?artifactName=linux.main&api-version=5.0&%24format=zip" --output olympus.zip
 unzip olympus.zip
 rm olympus.zip
 
