@@ -1,7 +1,9 @@
-import { AttachmentBuilder, Client, Events, GatewayIntentBits, MessageFlags, SectionBuilder, SnowflakeUtil, TextChannel } from "discord.js";
+import { AttachmentBuilder, Client, Events, GatewayIntentBits, Message, MessageCreateOptions, MessageFlags, MessagePayload, ReactionManager, SectionBuilder, SnowflakeUtil, TextChannel } from "discord.js";
 import { config } from "./config";
 import { CelesteSocket } from "./CelesteSocket";
 import UPNG from "upng-js";
+import { ApplyContext, EmojiMeaning } from "./EmojiMeaning";
+import { debounce } from "./utils";
 
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions],
@@ -17,7 +19,70 @@ const channelID = "1396661370757447680";
 const MINIMUM_REACTIONS_REQUIRED = 1;
 const REACTION_DEBOUNCE = 5;
 
+const emojiMeanings: EmojiMeaning[] = [
+    // All the regional indicators and add held keys
+    ...Array.from({ length: 26 }, (_, i) => {
+        const letter = String.fromCodePoint(0x1F1E6 + i); // Regional indicator symbols A-Z
+        return EmojiMeaning.holdKey(letter, String.fromCharCode(97 + i));
+    }),
+    
+    // leftwards_arrow_with_hook is enter
+    EmojiMeaning.holdKey("↩️", "Enter"),
+    // arrow_right_hook is tab
+    EmojiMeaning.holdKey("↪️", "Tab"),
+    // up, down, left, and right arrow keys
+    EmojiMeaning.holdKey("⬆️", "ArrowUp"),
+    EmojiMeaning.holdKey("⬇️", "ArrowDown"),
+    EmojiMeaning.holdKey("⬅️", "ArrowLeft"),
+    EmojiMeaning.holdKey("➡️", "ArrowRight"),
+    
+    // All the number symbols are individual frame counts
+    EmojiMeaning.wait("1️⃣", 0, 1),
+    EmojiMeaning.wait("2️⃣", 0, 2),
+    EmojiMeaning.wait("3️⃣", 0, 3),
+    EmojiMeaning.wait("4️⃣", 0, 4),
+    EmojiMeaning.wait("5️⃣", 0, 5),
+    EmojiMeaning.wait("6️⃣", 0, 6),
+    EmojiMeaning.wait("7️⃣", 0, 7),
+    EmojiMeaning.wait("8️⃣", 0, 8),
+    EmojiMeaning.wait("9️⃣", 0, 9),
+    EmojiMeaning.wait("🔟", 0, 10),
+    // Clock emojis are seconds, e.g. 1 o'clock is 1 second, 1:30 is 1.5 seconds, etc
+    EmojiMeaning.wait("🕐", 1, 0),
+    EmojiMeaning.wait("🕜", 1.5, 0),
+    EmojiMeaning.wait("🕑", 2, 0),
+    EmojiMeaning.wait("🕝", 2.5, 0),
+    EmojiMeaning.wait("🕒", 3, 0),
+    EmojiMeaning.wait("🕞", 3.5, 0),
+    EmojiMeaning.wait("🕓", 4, 0),
+    EmojiMeaning.wait("🕟", 4.5, 0),
+    EmojiMeaning.wait("🕔", 5, 0),
+    EmojiMeaning.wait("🕠", 5.5, 0),
+    EmojiMeaning.wait("🕕", 6, 0),
+    EmojiMeaning.wait("🕡", 6.5, 0),
+    EmojiMeaning.wait("🕖", 7, 0),
+    EmojiMeaning.wait("🕢", 7.5, 0),
+    EmojiMeaning.wait("🕗", 8, 0),
+    EmojiMeaning.wait("🕣", 8.5, 0),
+    EmojiMeaning.wait("🕘", 9, 0),
+    EmojiMeaning.wait("🕤", 9.5, 0),
+    EmojiMeaning.wait("🕙", 10, 0),
+    EmojiMeaning.wait("🕥", 10.5, 0),
+    EmojiMeaning.wait("🕚", 11, 0),
+    EmojiMeaning.wait("🕦", 11.5, 0),
+    EmojiMeaning.wait("🕛", 12, 0),
+    EmojiMeaning.wait("🕧", 12.5, 0),
+];
+
 let latestMessageID: string | null = null;
+
+async function sendToChannel(options: MessageCreateOptions): Promise<Message | null> {
+    const channel = client.channels.cache.get(channelID);
+    if(channel && channel.isTextBased()) {
+        return await (channel as TextChannel).send(options);
+    }
+    return null;
+}
 
 celesteSocket.once("connect", () => {
     console.log("Connected to Celeste!");
@@ -35,30 +100,16 @@ celesteSocket.on("screenshotData", async (frame) => {
     const pngArrayBuffer = UPNG.encode([arrayBuf], width, height, 256);
     const pngBuffer = Buffer.from(pngArrayBuffer);
     
-    const channel = client.channels.cache.get(channelID);
-    if(channel && channel.isTextBased()) {
-        const message = await (channel as TextChannel).send({
-            content: "Here's a screenshot of the game! See <#1396661382782517401> for how to play.",
-            files: [new AttachmentBuilder(pngBuffer, {
-                name: "celeste.png"
-            })]
-        });
-        
+    const message = await sendToChannel({
+        content: "Here's a screenshot of the game! See <#1396661382782517401> for how to play.",
+        files: [new AttachmentBuilder(pngBuffer, {
+            name: "celeste.png"
+        })]
+    });
+    if(message) {
         latestMessageID = message.id;
-        
-        await message.react("🇿");
-        await message.react("🇽");
-        await message.react("🇨");
-        await message.react("⬆️");
-        await message.react("⬇️");
-        await message.react("⬅️");
-        await message.react("➡️");
-        await message.react("1️⃣");
-        await message.react("2️⃣");
-        await message.react("5️⃣");
-        await message.react("🕐");
-        await message.react("🕑");
-        await message.react("🕔");
+    } else {
+        console.error("Failed to send message!");
     }
 });
 
@@ -132,6 +183,40 @@ client.once("ready", async () => {
     });
 });
 
+const reactionsFinishedDebounce = debounce((reactions: ReactionManager) => {
+    // Find all reactions with more than MINIMUM_REACTIONS_REQUIRED reactions
+    const validReactions = reactions.cache.filter(r => r.count >= MINIMUM_REACTIONS_REQUIRED);
+    if(validReactions.size === 0) {
+        // This isn't valid yet
+        return;
+    }
+    
+    // Apply all the reactions to a new context and continue only if the resulting context is valid
+    const context = new ApplyContext();
+    validReactions.forEach(reaction => {
+        const meaning = emojiMeanings.find(m => m.emoji === reaction.emoji.name);
+        if(meaning) {
+            meaning.apply(context);
+        }
+    });
+    
+    if(!context.isValid()) {
+        return;
+    }
+    
+    latestMessageID = null;
+    
+    // Awesome! Advance frames.
+    sendToChannel({
+        content: context.print()
+    });
+    
+    celesteSocket.sendAdvanceFrame({
+        KeysHeld: context.keysHeld,
+        FramesToAdvance: context.frames
+    });
+}, REACTION_DEBOUNCE * 1000);
+
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
     if (reaction.partial) {
 		try {
@@ -151,7 +236,8 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     }
 
     if(reaction.message.id === latestMessageID && user.id != client.user?.id) {
-        console.log(`Reacted ${reaction.emoji.name} to latest message`);
+        console.log(`Received ${reaction.emoji.name} reaction to latest message`);
+        reactionsFinishedDebounce(reaction.message.reactions);
     }
 })
 
