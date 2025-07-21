@@ -1,6 +1,9 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using Celeste.Mod;
 using Microsoft.Xna.Framework;
+using Microsoft.Xna.Framework.Input;
 
 
 /// <summary>
@@ -27,6 +30,11 @@ public class GameState {
     /// </summary>
     public int framesToAdvanceRemaining = 0;
     
+    /// <summary>
+    /// The keys that are currently held down.
+    /// </summary>
+    public List<Keys> heldKeys = new List<Keys>();
+    
     public GameState() {
         Instance = this;
     }
@@ -46,9 +54,16 @@ public class GameState {
             }
             
             framesToAdvanceRemaining = data.FramesToAdvance;
-            $"Advancing {framesToAdvanceRemaining} frames".Log();
-            
-            // TODO: Apply the keys held
+            $"Advancing {framesToAdvanceRemaining} frames with keys held: {data.KeysHeld.Aggregate("", (s, key) => s + $"{key}, ")}".Log(LogLevel.Verbose);
+        
+            heldKeys.Clear();
+            foreach(string key in data.KeysHeld) {
+                if(Enum.TryParse(key, out Keys parsedKey)) {
+                    heldKeys.Add(parsedKey);
+                } else {
+                    $"Failed to parse key: {key}".Log(LogLevel.Error);
+                }
+            }
         }
         
         framesToAdvanceRemaining -= 1;

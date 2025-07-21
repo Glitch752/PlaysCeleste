@@ -1,6 +1,9 @@
+import { AdvanceFrameData } from "./CelesteSocket";
+
 export class ApplyContext {
     public keysHeld: string[] = [];
     public frames: number = 0;
+    public frameMultiplier: number = 1;
     
     constructor() {
     }
@@ -9,8 +12,15 @@ export class ApplyContext {
         return this.frames > 0;
     }
     
+    getAdvanceFrameData(): AdvanceFrameData {
+        return {
+            KeysHeld: this.keysHeld,
+            FramesToAdvance: this.frames * this.frameMultiplier
+        };
+    }
+    
     print(): string {
-        let result = `Moving forward ${this.frames} frame${this.frames > 0 ? "s" : ""} with `;
+        let result = `Moving forward ${this.frames * this.frameMultiplier} frame${this.frames > 0 ? "s" : ""} with `;
         if(this.keysHeld.length == 0) {
             result += "no keys held.";
         } else {
@@ -41,6 +51,15 @@ export class EmojiMeaning {
             emoji,
             (ctx) => {
                 ctx.frames += frames + seconds * 60;
+            }
+        );
+    }
+    
+    public static waitMultiplier(emoji: string, multiplier: number): EmojiMeaning {
+        return new EmojiMeaning(
+            emoji,
+            (ctx) => {
+                ctx.frameMultiplier *= multiplier;
             }
         );
     }

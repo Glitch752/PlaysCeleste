@@ -4,6 +4,7 @@ import { CelesteSocket } from "./CelesteSocket";
 import UPNG from "upng-js";
 import { ApplyContext, EmojiMeaning } from "./EmojiMeaning";
 import { debounce } from "./utils";
+import { getMinimumReactionsRequired, getReactionDebounce, onSettingChanged } from "./settings";
 
 const client = new Client({
 	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions],
@@ -16,14 +17,11 @@ let celesteConnected = false;
 
 const channelID = "1396661370757447680";
 
-const MINIMUM_REACTIONS_REQUIRED = 1;
-const REACTION_DEBOUNCE = 5;
-
 const emojiMeanings: EmojiMeaning[] = [
     // All the regional indicators and add held keys
     ...Array.from({ length: 26 }, (_, i) => {
         const letter = String.fromCodePoint(0x1F1E6 + i); // Regional indicator symbols A-Z
-        return EmojiMeaning.holdKey(letter, String.fromCharCode(97 + i));
+        return EmojiMeaning.holdKey(letter, String.fromCharCode(65 + i)); // A-Z keys
     }),
     
     // leftwards_arrow_with_hook is enter
@@ -31,10 +29,15 @@ const emojiMeanings: EmojiMeaning[] = [
     // arrow_right_hook is tab
     EmojiMeaning.holdKey("↪️", "Tab"),
     // up, down, left, and right arrow keys
-    EmojiMeaning.holdKey("⬆️", "ArrowUp"),
-    EmojiMeaning.holdKey("⬇️", "ArrowDown"),
-    EmojiMeaning.holdKey("⬅️", "ArrowLeft"),
-    EmojiMeaning.holdKey("➡️", "ArrowRight"),
+    EmojiMeaning.holdKey("⬆️", "Up"),
+    EmojiMeaning.holdKey("⬇️", "Down"),
+    EmojiMeaning.holdKey("⬅️", "Left"),
+    EmojiMeaning.holdKey("➡️", "Right"),
+    // X means escape
+    EmojiMeaning.holdKey("❌", "Escape"),
+    
+    // Wait multipliers
+    EmojiMeaning.waitMultiplier("⏩", 6),
     
     // All the number symbols are individual frame counts
     EmojiMeaning.wait("1️⃣", 0, 1),
@@ -153,8 +156,12 @@ function cropImage(arrayBuf: ArrayBuffer, width: number, height: number): [Array
 }
 
 celesteSocket.on("message", (msg) => {
-    // TODO: Send in the channel
     console.log(`Received message to send: ${msg}`);
+    
+    sendToChannel({
+        content: msg,
+        flags: MessageFlags.SuppressEmbeds
+    });
 });
 
 celesteSocket.on("close", () => {
@@ -183,9 +190,15 @@ client.once("ready", async () => {
     });
 });
 
-const reactionsFinishedDebounce = debounce((reactions: ReactionManager) => {
+let reactionsFinishedDebounce = debounce(updateReactions, getReactionDebounce() * 1000);
+onSettingChanged(() => {
+    console.log("Settings changed, updating reaction debounce");
+    reactionsFinishedDebounce = debounce(updateReactions, getReactionDebounce() * 1000);
+});
+
+function updateReactions(reactions: ReactionManager) {
     // Find all reactions with more than MINIMUM_REACTIONS_REQUIRED reactions
-    const validReactions = reactions.cache.filter(r => r.count >= MINIMUM_REACTIONS_REQUIRED);
+    const validReactions = reactions.cache.filter(r => r.count >= getMinimumReactionsRequired());
     if(validReactions.size === 0) {
         // This isn't valid yet
         return;
@@ -211,11 +224,8 @@ const reactionsFinishedDebounce = debounce((reactions: ReactionManager) => {
         content: context.print()
     });
     
-    celesteSocket.sendAdvanceFrame({
-        KeysHeld: context.keysHeld,
-        FramesToAdvance: context.frames
-    });
-}, REACTION_DEBOUNCE * 1000);
+    celesteSocket.sendAdvanceFrame(context.getAdvanceFrameData());
+}
 
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
     if (reaction.partial) {
