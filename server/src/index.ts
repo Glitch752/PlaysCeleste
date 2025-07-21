@@ -33,6 +33,13 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.holdKey("⬇️", "Down"),
     EmojiMeaning.holdKey("⬅️", "Left"),
     EmojiMeaning.holdKey("➡️", "Right"),
+    EmojiMeaning.holdKeys("↖️", ["Up", "Left"]),
+    EmojiMeaning.holdKeys("↗️", ["Up", "Right"]),
+    EmojiMeaning.holdKeys("↙️", ["Down", "Left"]),
+    EmojiMeaning.holdKeys("↘️", ["Down", "Right"]),
+    EmojiMeaning.holdKeys("↔️", ["Left", "Right"]),
+    EmojiMeaning.holdKeys("↕️", ["Up", "Down"]),
+    
     // X means escape
     EmojiMeaning.holdKey("❌", "Escape"),
     
