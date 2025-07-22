@@ -4,18 +4,22 @@ using Celeste.Mod.mod;
 public static class ChapterCompletion {
     [Load]
     private static void Load() {
-        On.Celeste.Level.End += End;
+        On.Celeste.Level.CompleteArea_bool_bool_bool += CompleteArea;
     }
 
     [Unload]
     private static void Unload() {
-        On.Celeste.Level.End -= End;
+        On.Celeste.Level.CompleteArea_bool_bool_bool -= CompleteArea;
     }
     
-    private static void End(On.Celeste.Level.orig_End orig, Celeste.Level self) {
-        string chapterName = self.Session.Area.GetLevelSet();
+    private static ScreenWipe CompleteArea(
+        On.Celeste.Level.orig_CompleteArea_bool_bool_bool orig,
+        Level self,
+        bool spotlightWipe, bool skipScreenWipe, bool skipCompleteScreen
+    ) {
+        string chapterName = ChangeRoom.GetChapterName(self.Session.Area);
         SocketConnection.SendCompleteChapter(new SocketConnection.CompleteChapterEvent(chapterName));
         
-        orig(self);
+        return orig(self, spotlightWipe, skipScreenWipe, skipCompleteScreen);
     }
 }

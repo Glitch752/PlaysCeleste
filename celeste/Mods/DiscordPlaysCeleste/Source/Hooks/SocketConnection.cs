@@ -38,6 +38,8 @@ public static class SocketConnection {
     public class StrawberryCollectedEvent {
         public string roomName { get; set; }
         public string chapterName { get; set; }
+        public string idKey { get; set; }
+        public bool isGhost { get; set; }
         public bool isGolden { get; set; }
         public bool isWinged { get; set; }
         public int newStrawberryCount { get; set; }
@@ -45,11 +47,15 @@ public static class SocketConnection {
         public StrawberryCollectedEvent(
             string roomName,
             string chapterName,
+            string idKey,
+            bool isGhost,
             bool isGolden, bool isWinged,
             int newStrawberryCount
         ) {
             this.roomName = roomName;
             this.chapterName = chapterName;
+            this.idKey = idKey;
+            this.isGhost = isGhost;
             this.isGolden = isGolden;
             this.isWinged = isWinged;
             this.newStrawberryCount = newStrawberryCount;

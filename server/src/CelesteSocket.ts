@@ -30,8 +30,10 @@ export type FrameEvent = {
 };
 
 export type StrawberryCollectedEvent = {
-    levelName: string;
+    roomName: string;
     chapterName: string;
+    idKey: string;
+    isGhost: boolean;
     isGolden: boolean;
     isWinged: boolean;
     newStrawberryCount: number;
@@ -188,7 +190,6 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
         };
         
         this.mutex.run(async () => {
-            console.log(`Sending message ${type} of length ${payload.length}`);
             await write(header);
             await write(payload);
         });

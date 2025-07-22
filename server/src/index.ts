@@ -96,20 +96,15 @@ class DiscordPlaysCelesteServer {
         });
         
         this.celesteSocket.on("strawberryCollected", async (event) => {
-            const [isFirstTime, contributors] = await this.eventRecorder.collectStrawberry(
-                event.newStrawberryCount,
-                event.isWinged, event.isGolden,
-                event.levelName,
-                event.chapterName
-            );
+            const contributors = await this.eventRecorder.collectStrawberry(event);
             
             let content = "";
-            const firstTimeText = isFirstTime ? " for the first time" : "";
+            const firstTimeText = event.isGhost ? "" : " for the first time";
             const wingedText = event.isWinged ? " winged" : "";
             if(event.isGolden) {
-                content += `## :strawberry: Collected **${event.chapterName}**${wingedText} golden strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
+                content += `## :strawberry: Collected **$${event.chapterName}**${wingedText} golden strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
             } else {
-                content += `### :strawberry: Collected **${event.levelName}**${wingedText} strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
+                content += `### :strawberry: Collected **${event.chapterName} ${event.roomName}**${wingedText} strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
             }
             
             content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
@@ -122,25 +117,27 @@ class DiscordPlaysCelesteServer {
         });
         
         this.celesteSocket.on("changeRoom", async (roomEvent) => {
-            const [firstCompletion, contributors] = await this.eventRecorder.changeRoom(
+            const {
+                contributors,
+                firstClear,
+                wasCleared
+            } = await this.eventRecorder.changeRoom(
                 roomEvent.fromRoomName,
                 roomEvent.toRoomName,
                 roomEvent.chapterName
             );
             
-            let content = "";
-            if(firstCompletion) {
-                content += `### :trophy: **${roomEvent.toRoomName}** cleared for the first time!\n`;
-            } else {
-                content += `### :trophy: **${roomEvent.toRoomName}** cleared!\n`;
+            if(wasCleared && firstClear) {
+                let content = "";
+                content += `### :trophy: **${roomEvent.chapterName} ${roomEvent.toRoomName}** cleared for the first time!\n`;
+                content += `Clear team: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
+                content += "-# Note: clear team or room completion may not be accurate; it's just a heuristic!";
+                
+                this.sendToChannel({
+                    content,
+                    flags: MessageFlags.SuppressEmbeds
+                });
             }
-            content += `Clear team: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
-            content += "-# Note: clear team or room completion may not be accurate; it's just a heuristic!";
-            
-            this.sendToChannel({
-                content,
-                flags: MessageFlags.SuppressEmbeds
-            });
         });
         
         this.celesteSocket.on("completeChapter", async (chapterEvent) => {
