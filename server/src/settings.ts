@@ -2,7 +2,7 @@
 import fs from "fs";
 import path from "path";
 
-const settingsPath = path.resolve(__dirname, "settings.json");
+const settingsPath = path.resolve(__dirname, "..", "data", "settings.json");
 
 interface Settings {
     MINIMUM_REACTIONS_REQUIRED: number;
@@ -16,6 +16,13 @@ let settings: Settings = {
 
 // Load settings from file
 function loadSettings() {
+    if(!fs.existsSync(settingsPath)) {
+        console.warn("Settings file not found, using defaults.");
+        fs.mkdirSync(path.dirname(settingsPath), { recursive: true });
+        fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
+        return;
+    }
+    
     try {
         const data = fs.readFileSync(settingsPath, "utf-8");
         const parsed = JSON.parse(data);
@@ -26,19 +33,16 @@ function loadSettings() {
     }
 }
 
-let settingChangedCallbacks: (() => void)[] = [];
+// Initial load
+loadSettings();
 
 // Watch for changes and reload on-the-fly
 fs.watch(settingsPath, { persistent: false }, (eventType) => {
-    if (eventType === "change") {
+    if(eventType === "change") {
+        console.log("Settings file changed, reloading...");
         loadSettings();
-        
-        settingChangedCallbacks.forEach(callback => callback());
     }
 });
-
-// Initial load
-loadSettings();
 
 export function getMinimumReactionsRequired() {
     return settings.MINIMUM_REACTIONS_REQUIRED;
@@ -46,8 +50,4 @@ export function getMinimumReactionsRequired() {
 
 export function getReactionDebounce() {
     return settings.REACTION_DEBOUNCE;
-}
-
-export function onSettingChanged(callback: () => void) {
-    settingChangedCallbacks.push(callback);
 }

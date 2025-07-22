@@ -25,8 +25,8 @@ public static class MainLoopAdvance {
     /// <summary>
     /// Called before draw. We simulate a single advanced frame at 60FPS no matter what actually happened.
     /// </summary>
-    private static void OnUpdate(On.Monocle.Engine.orig_Update orig, Engine self, GameTime _gameTime) {
-        GameState.Instance.Update();
+    private static void OnUpdate(On.Monocle.Engine.orig_Update orig, Engine self, GameTime gameTime) {
+        GameState.Instance.Update(gameTime);
         
         orig(self, GameState.Instance.simulatedGameTime);
     }

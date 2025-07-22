@@ -37,3 +37,7 @@ Keys are only held until the next loop, so they must be repeated every time they
 ## Please work toward a shared goal!
 Feel free to communicate live; it makes it much more fun! The initial goal, of course, is to beat the game, but I'm not sure how feasible that is :upside_down:
 If someone is intentionally trying to stall progress, I don't currently have a mechanism in place for revoking permissions, but I plan to mute users if needed. Feel free to mess around if it's not harmful, though, of course!
+
+
+## TODO
+- Track hearts

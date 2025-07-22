@@ -12,11 +12,10 @@ public static class PreventExitGame {
     }
     
     private static void OnExit(On.Celeste.OuiMainMenu.orig_OnExit orig, Celeste.OuiMainMenu self) {
-        // #if DEBUG
-        // orig(self);
-        // return;
-        // #endif
-        
-        SocketConnection.SendMessage("Prevented exiting Celeste... whatcha doing?");
+        if(GameState.Instance.syncedState.ControlledByDiscord) {
+            SocketConnection.SendMessage("Prevented exiting Celeste... whatcha doing?");
+        } else {
+            orig(self);
+        }
     }
 }

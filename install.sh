@@ -13,9 +13,11 @@ rm dist.zip
 cd ..
 mv linux.main/ olympus/
 
-echo "\n\nDownloaded olympus. You'll need to go into the UI and set up the Celeste location and install Everest (testing done on version 5635).\nClose the application when ready."
+echo "\n\nDownloaded olympus. You'll need to go into the UI and set up the Celeste location and install Everest (testing done on version 5635).\nRun the game once, then close the application when ready."
 
 olympus/olympus
+
+sleep 1
 
 # TODO: Manual Everest installation without Olympus GUI
 

@@ -4,6 +4,7 @@ using System.Linq;
 using Celeste.Mod;
 using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Input;
+using Monocle;
 
 
 /// <summary>
@@ -35,16 +36,62 @@ public class GameState {
     /// </summary>
     public List<Keys> heldKeys = new List<Keys>();
     
+    /// <summary>
+    /// State that is synchronized only from the server.
+    /// </summary>
+    public class SyncedState {
+        /// <summary>
+        /// Whether the game is currently being controlled by Discord.  
+        /// If false, the game is being manually controlled instead.
+        /// </summary>
+        public bool ControlledByDiscord { get; set; } = true;
+        
+        public override string ToString() {
+            return $"ControlledByDiscord: {ControlledByDiscord}";
+        }
+    }
+    
+    /// <summary>
+    /// The state that is synchronized from the server.
+    /// </summary>
+    public SyncedState syncedState = new SyncedState();
+    
     public GameState() {
         Instance = this;
     }
     
-    public void Update() {
+    public void Reset() {
+        shouldScreenshot = false;
+        framesToAdvanceRemaining = 0;
+        heldKeys.Clear();
+    }
+    
+    private void UpdateManualControl(GameTime gameTime) {
+        SimulatedTimeTicks += gameTime.ElapsedGameTime.Ticks;
+        simulatedGameTime = new GameTime(new TimeSpan(SimulatedTimeTicks), gameTime.ElapsedGameTime, false);
+        Reset();
+    }
+    
+    public void Update(GameTime gameTime) {
+        if(!syncedState.ControlledByDiscord) {
+            SocketConnection.ConsumeUpdatesNonblocking();
+            if(!syncedState.ControlledByDiscord) { // We may have just switched to Discord control
+                UpdateManualControl(gameTime);
+                return;
+            }
+        }
+        
         if(framesToAdvanceRemaining <= 0) {
             // If we shouldn't run another frame, wait until the server tells us to
             SocketConnection.FrameAdvanceData data = SocketConnection.WaitForFrameAdvance();
             if(data == null) {
                 "Failed to deserialize frame data.".Log(LogLevel.Error);
+                return;
+            }
+            
+            if(!syncedState.ControlledByDiscord) {
+                $"Game is not controlled by Discord, ignoring frame advance request.".Log(LogLevel.Info);
+                UpdateManualControl(gameTime);
                 return;
             }
             
@@ -56,6 +103,10 @@ public class GameState {
             framesToAdvanceRemaining = data.FramesToAdvance;
             $"Advancing {framesToAdvanceRemaining} frames with keys held: {data.KeysHeld.Aggregate("", (s, key) => s + $"{key}, ")}".Log(LogLevel.Verbose);
         
+            if(framesToAdvanceRemaining > 1000) {
+                SocketConnection.SendMessage($"[Nice one.](https://discord.com/channels/1396648547708829778/1396661370757447680/1396944113743560894)");
+            }
+        
             heldKeys.Clear();
             foreach(string key in data.KeysHeld) {
                 if(Enum.TryParse(key, out Keys parsedKey)) {
@@ -64,6 +115,10 @@ public class GameState {
                     $"Failed to parse key: {key}".Log(LogLevel.Error);
                 }
             }
+        }
+        
+        if(framesToAdvanceRemaining > 0 && framesToAdvanceRemaining % 1000 == 0) {
+            SocketConnection.SendMessage($"I'm still working on it... ${framesToAdvanceRemaining} frames remaining");
         }
         
         framesToAdvanceRemaining -= 1;

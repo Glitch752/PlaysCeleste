@@ -1,9 +1,12 @@
 import { EventEmitter } from "events";
 import * as net from "net";
 import fs from "fs";
+import { SyncedState } from "./state";
+import { AsyncMutex } from "./utils";
 
-export enum ServerToCelesteMsg {
-    AdvanceFrame = 0x01
+export enum ServerToCelesteMessageType {
+    AdvanceFrame = 0x01,
+    UpdateSyncedState = 0x02
 }
 
 export type AdvanceFrameData = {
@@ -11,9 +14,13 @@ export type AdvanceFrameData = {
     FramesToAdvance: number
 }
 
-export enum CelesteToServerMsg {
+export enum CelesteToServerMessageType {
     ScreenshotData = 0x01,
-    Message = 0x02
+    Message = 0x02,
+    PlayerDeath = 0x03,
+    StrawberryCollected = 0x04,
+    ChangeRoom = 0x05,
+    CompleteChapter = 0x06
 }
 
 export type FrameEvent = {
@@ -22,17 +29,40 @@ export type FrameEvent = {
     height: number;
 };
 
+export type StrawberryCollectedEvent = {
+    levelName: string;
+    chapterName: string;
+    isGolden: boolean;
+    isWinged: boolean;
+    newStrawberryCount: number;
+};
+
+export type ChangeRoomEvent = {
+    fromRoomName: string;
+    toRoomName: string;
+    chapterName: string;
+};
+
+export type CompleteChapterEvent = {
+    chapterName: string;
+};
+
 type CelesteEventMap = {
     connect: [];
     close: [];
     error: [Error];
     screenshotData: [FrameEvent];
     message: [string];
+    playerDeath: [];
+    strawberryCollected: [StrawberryCollectedEvent];
+    changeRoom: [ChangeRoomEvent];
+    completeChapter: [CompleteChapterEvent];
 };
 
 export class CelesteSocket extends EventEmitter<CelesteEventMap> {
     private socket: net.Socket | null = null;
     private recvBuffer: Buffer = Buffer.alloc(0);
+    private mutex: AsyncMutex = new AsyncMutex();
     
     private static readonly SOCKET_FILE = "/tmp/discord-plays-celeste.sock";
     private static readonly RETRY_INTERVAL_MS = 500;
@@ -70,9 +100,14 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
             })
             .on("error", (err) => this.emit("error", err));
     }
+    
     public sendAdvanceFrame(data: AdvanceFrameData) {
         const json = Buffer.from(JSON.stringify(data), "utf8");
-        this.writeMessage(ServerToCelesteMsg.AdvanceFrame, json);
+        this.writeMessage(ServerToCelesteMessageType.AdvanceFrame, json);
+    }
+    public updateSyncedState(state: SyncedState) {
+        const json = Buffer.from(JSON.stringify(state), "utf8");
+        this.writeMessage(ServerToCelesteMessageType.UpdateSyncedState, json);
     }
     
     /** Cleanly close the connection. */
@@ -97,7 +132,7 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
             this.recvBuffer = this.recvBuffer.subarray(total);
             
             switch (type) {
-                case CelesteToServerMsg.ScreenshotData:
+                case CelesteToServerMessageType.ScreenshotData: {
                     // First 8 bytes are width and height
                     const width = payload.readUInt32LE(0);
                     const height = payload.readUInt32LE(4);
@@ -105,23 +140,57 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
                     const data = payload.subarray(8);
                     this.emit("screenshotData", { data, width, height });
                     break;
-                case CelesteToServerMsg.Message:
+                }
+                case CelesteToServerMessageType.Message: {
                     const string = payload.toString("utf8");
                     this.emit("message", string);
                     break;
+                }
+                case CelesteToServerMessageType.PlayerDeath: {
+                    this.emit("playerDeath");
+                    break;
+                }
+                case CelesteToServerMessageType.StrawberryCollected: {
+                    const json = JSON.parse(payload.toString("utf8"));
+                    this.emit("strawberryCollected", json as StrawberryCollectedEvent);
+                    break;
+                }
+                case CelesteToServerMessageType.ChangeRoom: {
+                    const json = JSON.parse(payload.toString("utf8"));
+                    this.emit("changeRoom", json as ChangeRoomEvent);
+                    break;
+                }
+                case CelesteToServerMessageType.CompleteChapter: {
+                    const json = JSON.parse(payload.toString("utf8"));
+                    this.emit("completeChapter", json as CompleteChapterEvent);
+                    break;
+                }
                 default:
                     this.emit("error", new Error(`Unknown message type 0x${type.toString(16)}`));
             }
         }
     }
     
-    private writeMessage(type: ServerToCelesteMsg, payload: Buffer) {
+    private writeMessage(type: ServerToCelesteMessageType, payload: Buffer) {
         if(!this.socket) return;
         
         const header = Buffer.alloc(5);
         header.writeUInt8(type, 0);
-        header.writeUInt32LE(payload.length, 1);
-        this.socket.write(header);
-        this.socket.write(payload);
+        header.writeInt32LE(payload.length, 1);
+        
+        const write = (buffer: Uint8Array) => {
+            return new Promise<void>((resolve, reject) => {
+                this.socket!.write(buffer, (err) => {
+                    if (err) reject(err);
+                    else resolve();
+                });
+            });
+        };
+        
+        this.mutex.run(async () => {
+            console.log(`Sending message ${type} of length ${payload.length}`);
+            await write(header);
+            await write(payload);
+        });
     }
 }

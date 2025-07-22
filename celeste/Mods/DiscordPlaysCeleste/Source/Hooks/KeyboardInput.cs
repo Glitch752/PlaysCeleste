@@ -13,9 +13,14 @@ public static class KeyboardInput {
     }
     
     private static void Update(On.Monocle.MInput.KeyboardData.orig_Update orig, Monocle.MInput.KeyboardData self) {
-        self.PreviousState = self.CurrentState;
-        
-        KeyboardState state = new KeyboardState(GameState.Instance.heldKeys.ToArray());
-        self.CurrentState = state;
+        if(GameState.Instance.syncedState.ControlledByDiscord) {
+            self.PreviousState = self.CurrentState;
+            
+            KeyboardState state = new KeyboardState(GameState.Instance.heldKeys.ToArray());
+            self.CurrentState = state;
+        } else {
+            // If we're not controlled by Discord, just use the original update method.
+            orig(self);
+        }
     }
 }

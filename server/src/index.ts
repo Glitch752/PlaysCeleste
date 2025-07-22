@@ -1,261 +1,308 @@
-import { AttachmentBuilder, Client, Events, GatewayIntentBits, Message, MessageCreateOptions, MessageFlags, MessagePayload, ReactionManager, SectionBuilder, SnowflakeUtil, TextChannel } from "discord.js";
+import { AttachmentBuilder, Client, Events, GatewayIntentBits, Message, MessageCreateOptions, MessageFlags, ReactionManager, TextChannel } from "discord.js";
 import { config } from "./config";
 import { CelesteSocket } from "./CelesteSocket";
 import UPNG from "upng-js";
-import { ApplyContext, EmojiMeaning } from "./EmojiMeaning";
+import { ApplyContext, findEmojiMeaning } from "./EmojiMeaning";
 import { debounce } from "./utils";
-import { getMinimumReactionsRequired, getReactionDebounce, onSettingChanged } from "./settings";
+import { getMinimumReactionsRequired, getReactionDebounce } from "./settings";
+import { getSyncedState, setStateChangeCallback } from "./state";
+import { EventRecorder, EventUser } from "./EventRecorder";
 
-const client = new Client({
-	intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions],
-});
+class DiscordPlaysCelesteServer {
+    private client: Client;
+    private celesteSocket: CelesteSocket;
+    private framesReceived = 0;
+    private celesteConnected = false;
+    private latestMessageID: string | null = null;
+    private reactionsFinishedDebounce: (reactions: ReactionManager) => void;
+    private eventRecorder: EventRecorder;
 
-const celesteSocket = new CelesteSocket();
-let framesReceived = 0;
+    constructor() {
+        this.eventRecorder = new EventRecorder();
+        
+        this.client = new Client({
+            intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.GuildMessageReactions],
+        });
 
-let celesteConnected = false;
+        this.celesteSocket = new CelesteSocket();
 
-const channelID = "1396661370757447680";
+        setStateChangeCallback(() => {
+            this.celesteSocket.updateSyncedState(getSyncedState());
+        });
 
-const emojiMeanings: EmojiMeaning[] = [
-    // All the regional indicators and add held keys
-    ...Array.from({ length: 26 }, (_, i) => {
-        const letter = String.fromCodePoint(0x1F1E6 + i); // Regional indicator symbols A-Z
-        return EmojiMeaning.holdKey(letter, String.fromCharCode(65 + i)); // A-Z keys
-    }),
-    
-    // leftwards_arrow_with_hook is enter
-    EmojiMeaning.holdKey("↩️", "Enter"),
-    // arrow_right_hook is tab
-    EmojiMeaning.holdKey("↪️", "Tab"),
-    // up, down, left, and right arrow keys
-    EmojiMeaning.holdKey("⬆️", "Up"),
-    EmojiMeaning.holdKey("⬇️", "Down"),
-    EmojiMeaning.holdKey("⬅️", "Left"),
-    EmojiMeaning.holdKey("➡️", "Right"),
-    EmojiMeaning.holdKeys("↖️", ["Up", "Left"]),
-    EmojiMeaning.holdKeys("↗️", ["Up", "Right"]),
-    EmojiMeaning.holdKeys("↙️", ["Down", "Left"]),
-    EmojiMeaning.holdKeys("↘️", ["Down", "Right"]),
-    EmojiMeaning.holdKeys("↔️", ["Left", "Right"]),
-    EmojiMeaning.holdKeys("↕️", ["Up", "Down"]),
-    
-    // X means escape
-    EmojiMeaning.holdKey("❌", "Escape"),
-    
-    // Wait multipliers
-    EmojiMeaning.waitMultiplier("⏩", 6),
-    
-    // All the number symbols are individual frame counts
-    EmojiMeaning.wait("1️⃣", 0, 1),
-    EmojiMeaning.wait("2️⃣", 0, 2),
-    EmojiMeaning.wait("3️⃣", 0, 3),
-    EmojiMeaning.wait("4️⃣", 0, 4),
-    EmojiMeaning.wait("5️⃣", 0, 5),
-    EmojiMeaning.wait("6️⃣", 0, 6),
-    EmojiMeaning.wait("7️⃣", 0, 7),
-    EmojiMeaning.wait("8️⃣", 0, 8),
-    EmojiMeaning.wait("9️⃣", 0, 9),
-    EmojiMeaning.wait("🔟", 0, 10),
-    // Clock emojis are seconds, e.g. 1 o'clock is 1 second, 1:30 is 1.5 seconds, etc
-    EmojiMeaning.wait("🕐", 1, 0),
-    EmojiMeaning.wait("🕜", 1.5, 0),
-    EmojiMeaning.wait("🕑", 2, 0),
-    EmojiMeaning.wait("🕝", 2.5, 0),
-    EmojiMeaning.wait("🕒", 3, 0),
-    EmojiMeaning.wait("🕞", 3.5, 0),
-    EmojiMeaning.wait("🕓", 4, 0),
-    EmojiMeaning.wait("🕟", 4.5, 0),
-    EmojiMeaning.wait("🕔", 5, 0),
-    EmojiMeaning.wait("🕠", 5.5, 0),
-    EmojiMeaning.wait("🕕", 6, 0),
-    EmojiMeaning.wait("🕡", 6.5, 0),
-    EmojiMeaning.wait("🕖", 7, 0),
-    EmojiMeaning.wait("🕢", 7.5, 0),
-    EmojiMeaning.wait("🕗", 8, 0),
-    EmojiMeaning.wait("🕣", 8.5, 0),
-    EmojiMeaning.wait("🕘", 9, 0),
-    EmojiMeaning.wait("🕤", 9.5, 0),
-    EmojiMeaning.wait("🕙", 10, 0),
-    EmojiMeaning.wait("🕥", 10.5, 0),
-    EmojiMeaning.wait("🕚", 11, 0),
-    EmojiMeaning.wait("🕦", 11.5, 0),
-    EmojiMeaning.wait("🕛", 12, 0),
-    EmojiMeaning.wait("🕧", 12.5, 0),
-];
+        this.reactionsFinishedDebounce = debounce(this.updateReactions.bind(this), () => getReactionDebounce() * 1000);
 
-let latestMessageID: string | null = null;
+        this.setupCelesteSocketEvents();
+        this.setupClientEvents();
 
-async function sendToChannel(options: MessageCreateOptions): Promise<Message | null> {
-    const channel = client.channels.cache.get(channelID);
-    if(channel && channel.isTextBased()) {
-        return await (channel as TextChannel).send(options);
+        this.client.login(config.DISCORD_TOKEN);
     }
-    return null;
-}
 
-celesteSocket.once("connect", () => {
-    console.log("Connected to Celeste!");
-    celesteConnected = true;
-});
-
-celesteSocket.on("screenshotData", async (frame) => {
-    console.log(`Received ${frame.width}x${frame.height} frame (${framesReceived++})`);
-
-    // Encode as PNG and save
-    let arrayBuf = Uint8Array.from(frame.data).buffer;
-    let width = frame.width, height = frame.height;
-    [arrayBuf, width, height] = cropImage(arrayBuf, frame.width, frame.height);
-    
-    const pngArrayBuffer = UPNG.encode([arrayBuf], width, height, 256);
-    const pngBuffer = Buffer.from(pngArrayBuffer);
-    
-    const message = await sendToChannel({
-        content: "Here's a screenshot of the game! See <#1396661382782517401> for how to play.",
-        files: [new AttachmentBuilder(pngBuffer, {
-            name: "celeste.png"
-        })]
-    });
-    if(message) {
-        latestMessageID = message.id;
-    } else {
-        console.error("Failed to send message!");
-    }
-});
-
-// Celeste renders the actual game content in a 16:9 box in the middle of the screen.
-// If the window isn't exactly 16:9, there are black bars on the sides of the screen that we don't want to send.
-// This shouldn't happen, but it does in testing.
-function cropImage(arrayBuf: ArrayBuffer, width: number, height: number): [ArrayBuffer, number, number] {
-    const aspectRatio = 16 / 9;
-    const targetWidth = Math.floor(height * aspectRatio);
-    
-    if(width === targetWidth) return [arrayBuf, width, height]; // Already correct aspect ratio
-    
-    if(width > targetWidth) {
-        // Too wide, crop sides
-        const bytesPerPixel = 4; // RGBA
-        const cropX = Math.floor((width - targetWidth) / 2);
-        const cropped = new Uint8Array(targetWidth * height * bytesPerPixel);
-        const src = new Uint8Array(arrayBuf);
-
-        for(let y = 0; y < height; y++) {
-            const srcStart = (y * width + cropX) * bytesPerPixel;
-            const destStart = (y * targetWidth) * bytesPerPixel;
-            cropped.set(src.subarray(srcStart, srcStart + targetWidth * bytesPerPixel), destStart);
+    private async sendToChannel(options: MessageCreateOptions): Promise<Message | null> {
+        const channel = this.client.channels.cache.get(config.CHANNEL_ID);
+        if(channel && channel.isTextBased()) {
+            return await (channel as TextChannel).send(options);
         }
-        return [cropped.buffer, targetWidth, height];
-    } else {
-        // Too narrow, crop top and bottom
-        const bytesPerPixel = 4; // RGBA
-        const targetHeight = Math.floor(width / aspectRatio);
-        const cropY = Math.floor((height - targetHeight) / 2);
-        const cropped = new Uint8Array(width * targetHeight * bytesPerPixel);
-        const src = new Uint8Array(arrayBuf);
+        return null;
+    }
 
-        for(let y = 0; y < targetHeight; y++) {
-            const srcStart = ((y + cropY) * width) * bytesPerPixel;
-            const destStart = (y * width) * bytesPerPixel;
-            cropped.set(src.subarray(srcStart, srcStart + width * bytesPerPixel), destStart);
+    private setupCelesteSocketEvents() {
+        this.celesteSocket.once("connect", () => {
+            console.log("Connected to Celeste!");
+            this.celesteConnected = true;
+        });
+
+        this.celesteSocket.on("screenshotData", async (frame) => {
+            console.log(`Received ${frame.width}x${frame.height} frame (${this.framesReceived++})`);
+
+            // Encode as PNG and save
+            let arrayBuf = Uint8Array.from(frame.data).buffer;
+            let width = frame.width, height = frame.height;
+            [arrayBuf, width, height] = this.cropImage(arrayBuf, frame.width, frame.height);
+
+            const pngArrayBuffer = UPNG.encode([arrayBuf], width, height, 256);
+            const pngBuffer = Buffer.from(pngArrayBuffer);
+
+            const message = await this.sendToChannel({
+                content: "Here's a screenshot of the game! See <#1396661382782517401> for how to play.",
+                files: [new AttachmentBuilder(pngBuffer, {
+                    name: "celeste.png"
+                })]
+            });
+            if(message) {
+                this.latestMessageID = message.id;
+            } else {
+                console.error("Failed to send message!");
+            }
+        });
+
+        this.celesteSocket.on("message", (msg) => {
+            console.log(`Received message to send: ${msg}`);
+
+            this.sendToChannel({
+                content: msg,
+                flags: MessageFlags.SuppressEmbeds
+            });
+            
+            this.eventRecorder.recordMessage(msg);
+        });
+        
+        this.celesteSocket.on("playerDeath", () => {
+            this.sendToChannel({
+                content: "<:annoyedeline:1396712320452792452> Madeline died",
+                flags: MessageFlags.SuppressEmbeds
+            });
+            this.eventRecorder.playerDeath();
+        });
+        
+        this.celesteSocket.on("strawberryCollected", async (event) => {
+            const [isFirstTime, contributors] = await this.eventRecorder.collectStrawberry(
+                event.newStrawberryCount,
+                event.isWinged, event.isGolden,
+                event.levelName,
+                event.chapterName
+            );
+            
+            let content = "";
+            const firstTimeText = isFirstTime ? " for the first time" : "";
+            const wingedText = event.isWinged ? " winged" : "";
+            if(event.isGolden) {
+                content += `## :strawberry: Collected **${event.chapterName}**${wingedText} golden strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
+            } else {
+                content += `### :strawberry: Collected **${event.levelName}**${wingedText} strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
+            }
+            
+            content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
+            content += "-# Note: contributors may not be accurate; it's just a heuristic!";
+            
+            this.sendToChannel({
+                content,
+                flags: MessageFlags.SuppressEmbeds
+            });
+        });
+        
+        this.celesteSocket.on("changeRoom", async (roomEvent) => {
+            const [firstCompletion, contributors] = await this.eventRecorder.changeRoom(
+                roomEvent.fromRoomName,
+                roomEvent.toRoomName,
+                roomEvent.chapterName
+            );
+            
+            let content = "";
+            if(firstCompletion) {
+                content += `### :trophy: **${roomEvent.toRoomName}** cleared for the first time!\n`;
+            } else {
+                content += `### :trophy: **${roomEvent.toRoomName}** cleared!\n`;
+            }
+            content += `Clear team: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
+            content += "-# Note: clear team or room completion may not be accurate; it's just a heuristic!";
+            
+            this.sendToChannel({
+                content,
+                flags: MessageFlags.SuppressEmbeds
+            });
+        });
+        
+        this.celesteSocket.on("completeChapter", async (chapterEvent) => {
+            const [firstCompletion, contributors] = await this.eventRecorder.completeChapter(chapterEvent.chapterName);
+            
+            let content = "";
+            if(firstCompletion) {
+                content += `## :trophy: **${chapterEvent.chapterName}** completed for the first time!\n`;
+            } else {
+                content += `## :trophy: **${chapterEvent.chapterName}** completed!\n`;
+            }
+            content += `Completion team: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
+            content += "-# Note: completion team may not be accurate; it's just a heuristic!";
+            
+            this.sendToChannel({
+                content,
+                flags: MessageFlags.SuppressEmbeds
+            });
+        });
+
+        this.celesteSocket.on("close", () => {
+            console.log("Disconnected from Celeste");
+            this.celesteConnected = false;
+        });
+
+        this.celesteSocket.on("error", (e) => {
+            console.error("Celeste socket error:", e);
+        });
+    }
+
+    /**
+     * Celeste renders the actual game content in a 16:9 box in the middle of the screen.
+     * If the window isn't exactly 16:9, there are black bars on the sides of the screen that we don't want to send.
+     * This shouldn't happen, but it does in testing.
+     */
+    private cropImage(arrayBuf: ArrayBuffer, width: number, height: number): [ArrayBuffer, number, number] {
+        const aspectRatio = 16 / 9;
+        const targetWidth = Math.floor(height * aspectRatio);
+
+        if(width === targetWidth) return [arrayBuf, width, height]; // Already correct aspect ratio
+
+        if(width > targetWidth) {
+            // Too wide, crop sides
+            const bytesPerPixel = 4; // RGBA
+            const cropX = Math.floor((width - targetWidth) / 2);
+            const cropped = new Uint8Array(targetWidth * height * bytesPerPixel);
+            const src = new Uint8Array(arrayBuf);
+
+            for(let y = 0; y < height; y++) {
+                const srcStart = (y * width + cropX) * bytesPerPixel;
+                const destStart = (y * targetWidth) * bytesPerPixel;
+                cropped.set(src.subarray(srcStart, srcStart + targetWidth * bytesPerPixel), destStart);
+            }
+            return [cropped.buffer, targetWidth, height];
+        } else {
+            // Too narrow, crop top and bottom
+            const bytesPerPixel = 4; // RGBA
+            const targetHeight = Math.floor(width / aspectRatio);
+            const cropY = Math.floor((height - targetHeight) / 2);
+            const cropped = new Uint8Array(width * targetHeight * bytesPerPixel);
+            const src = new Uint8Array(arrayBuf);
+
+            for(let y = 0; y < targetHeight; y++) {
+                const srcStart = ((y + cropY) * width) * bytesPerPixel;
+                const destStart = (y * width) * bytesPerPixel;
+                cropped.set(src.subarray(srcStart, srcStart + width * bytesPerPixel), destStart);
+            }
+            return [cropped.buffer, width, targetHeight];
         }
-        return [cropped.buffer, width, targetHeight];
     }
-}
 
-celesteSocket.on("message", (msg) => {
-    console.log(`Received message to send: ${msg}`);
-    
-    sendToChannel({
-        content: msg,
-        flags: MessageFlags.SuppressEmbeds
-    });
-});
-
-celesteSocket.on("close", () => {
-    console.log("Disconnected from Celeste");
-    celesteConnected = false;
-});
-
-celesteSocket.on("error", (e) => {
-    console.error("Celeste socket error:", e);
-});
-
-client.once("ready", async () => {
-    console.log("Ready!");
-    
-    if(!celesteConnected) {
-        // Wait for celeste to connect
-        console.log("Waiting for Celeste to connect...");
-        while(!celesteConnected) {
-            await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-    }
-    
-    celesteSocket.sendAdvanceFrame({
-        KeysHeld: [],
-        FramesToAdvance: 5
-    });
-});
-
-let reactionsFinishedDebounce = debounce(updateReactions, getReactionDebounce() * 1000);
-onSettingChanged(() => {
-    console.log("Settings changed, updating reaction debounce");
-    reactionsFinishedDebounce = debounce(updateReactions, getReactionDebounce() * 1000);
-});
-
-function updateReactions(reactions: ReactionManager) {
-    // Find all reactions with more than MINIMUM_REACTIONS_REQUIRED reactions
-    const validReactions = reactions.cache.filter(r => r.count >= getMinimumReactionsRequired());
-    if(validReactions.size === 0) {
-        // This isn't valid yet
-        return;
-    }
-    
-    // Apply all the reactions to a new context and continue only if the resulting context is valid
-    const context = new ApplyContext();
-    validReactions.forEach(reaction => {
-        const meaning = emojiMeanings.find(m => m.emoji === reaction.emoji.name);
-        if(meaning) {
-            meaning.apply(context);
-        }
-    });
-    
-    if(!context.isValid()) {
-        return;
-    }
-    
-    latestMessageID = null;
-    
-    // Awesome! Advance frames.
-    sendToChannel({
-        content: context.print()
-    });
-    
-    celesteSocket.sendAdvanceFrame(context.getAdvanceFrameData());
-}
-
-client.on(Events.MessageReactionAdd, async (reaction, user) => {
-    if (reaction.partial) {
-		try {
-			await reaction.fetch();
-		} catch(error) {
-            console.log(`Error fetching partial reaction: ${error}`);
-			return;
-		}
-	}
-    if(user.partial) {
-        try {
-            await user.fetch();
-        } catch(error) {
-            console.log(`Error fetching partial user: ${error}`);
+    private updateReactions(reactions: ReactionManager) {
+        // Find all reactions with more than MINIMUM_REACTIONS_REQUIRED reactions
+        const validReactions = [...reactions.cache.values()].filter(r => r.count >= getMinimumReactionsRequired());
+        if(validReactions.length === 0) {
+            // This isn't valid yet
             return;
         }
+
+        // Apply all the reactions to a new context and continue only if the resulting context is valid
+        const context = new ApplyContext();
+        validReactions.forEach(reaction => {
+            const meaning = findEmojiMeaning(reaction.emoji.name);
+            if(meaning) meaning.apply(context);
+        });
+
+        if(!context.isValid()) {
+            return;
+        }
+        
+        let contributors = validReactions.flatMap(r => {
+            return r.users.cache.map(u => ({
+                id: u.id,
+                username: u.username
+            })).filter(u => u.id !== this.client.user?.id);
+        }).filter(u => u !== null);
+        
+        // Deduplicate contributors
+        const uniqueContributors = new Map<string, EventUser>();
+        contributors.forEach(user => {
+            if(!uniqueContributors.has(user.id)) {
+                uniqueContributors.set(user.id, user);
+            }
+        });
+        contributors = Array.from(uniqueContributors.values());
+
+        this.latestMessageID = null;
+
+        // Awesome! Advance frames.
+        this.sendToChannel({
+            content: context.print()
+        });
+
+        const advanceData = context.getAdvanceFrameData();
+        this.celesteSocket.sendAdvanceFrame(advanceData);
+        
+        this.eventRecorder.recordInputHistory(advanceData, contributors);
     }
 
-    if(reaction.message.id === latestMessageID && user.id != client.user?.id) {
-        console.log(`Received ${reaction.emoji.name} reaction to latest message`);
-        reactionsFinishedDebounce(reaction.message.reactions);
-    }
-})
+    private setupClientEvents() {
+        this.client.once("ready", async () => {
+            console.log("Ready!");
 
-client.login(config.DISCORD_TOKEN);
+            if(!this.celesteConnected) {
+                // Wait for celeste to connect
+                console.log("Waiting for Celeste to connect...");
+                while(!this.celesteConnected) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+
+            this.celesteSocket.updateSyncedState(getSyncedState());
+            this.celesteSocket.sendAdvanceFrame({
+                KeysHeld: [],
+                FramesToAdvance: 1
+            });
+        });
+
+        this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
+            if (reaction.partial) {
+                try {
+                    await reaction.fetch();
+                } catch(error) {
+                    console.log(`Error fetching partial reaction: ${error}`);
+                    return;
+                }
+            }
+            if(user.partial) {
+                try {
+                    await user.fetch();
+                } catch(error) {
+                    console.log(`Error fetching partial user: ${error}`);
+                    return;
+                }
+            }
+
+            if(reaction.message.id === this.latestMessageID && user.id != this.client.user?.id) {
+                console.log(`Received ${reaction.emoji.name} reaction to latest message`);
+                this.reactionsFinishedDebounce(reaction.message.reactions);
+            }
+        });
+    }
+}
+
+new DiscordPlaysCelesteServer();
