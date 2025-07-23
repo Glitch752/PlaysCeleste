@@ -7,11 +7,13 @@ const settingsPath = path.resolve(__dirname, "..", "data", "settings.json");
 interface Settings {
     MINIMUM_REACTIONS_REQUIRED: number;
     REACTION_DEBOUNCE: number;
+    MAX_FRAMES: number;
 }
 
 let settings: Settings = {
     MINIMUM_REACTIONS_REQUIRED: 1,
     REACTION_DEBOUNCE: 5,
+    MAX_FRAMES: 1000
 };
 
 // Load settings from file
@@ -50,4 +52,8 @@ export function getMinimumReactionsRequired() {
 
 export function getReactionDebounce() {
     return settings.REACTION_DEBOUNCE;
+}
+
+export function getMaxFrames() {
+    return settings.MAX_FRAMES;
 }

@@ -103,10 +103,6 @@ public class GameState {
             framesToAdvanceRemaining = data.FramesToAdvance;
             $"Advancing {framesToAdvanceRemaining} frames with keys held: {data.KeysHeld.Aggregate("", (s, key) => s + $"{key}, ")}".Log(LogLevel.Verbose);
         
-            if(framesToAdvanceRemaining > 1000) {
-                SocketConnection.SendMessage($"[Nice one.](https://discord.com/channels/1396648547708829778/1396661370757447680/1396944113743560894)");
-            }
-        
             heldKeys.Clear();
             foreach(string key in data.KeysHeld) {
                 if(Enum.TryParse(key, out Keys parsedKey)) {
@@ -118,7 +114,7 @@ public class GameState {
         }
         
         if(framesToAdvanceRemaining > 0 && framesToAdvanceRemaining % 1000 == 0) {
-            SocketConnection.SendMessage($"I'm still working on it... ${framesToAdvanceRemaining} frames remaining");
+            SocketConnection.SendMessage($"I'm still working on it... {framesToAdvanceRemaining} frames remaining");
         }
         
         framesToAdvanceRemaining -= 1;

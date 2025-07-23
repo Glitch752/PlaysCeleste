@@ -215,7 +215,6 @@ export class EventRecorder {
             type: EventType.Death,
             contributors: this.currentContributors
         });
-        this.clearContributors();
     }
     
     /**

@@ -78,12 +78,14 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
         const tryConnect = () => {
             console.log(`Waiting for Celeste socket file at ${CelesteSocket.SOCKET_FILE}...`);
             fs.stat(CelesteSocket.SOCKET_FILE, (err, stats) => {
-                if (!err && stats.isSocket()) {
-                    this.socket = net.createConnection(CelesteSocket.SOCKET_FILE);
-                    this.connect();
-                } else {
-                    setTimeout(tryConnect, CelesteSocket.RETRY_INTERVAL_MS);
-                }
+                setTimeout(() => {
+                    if(!err && stats.isSocket()) {
+                        this.socket = net.createConnection(CelesteSocket.SOCKET_FILE);
+                        this.connect();
+                    } else {
+                        tryConnect();
+                    }
+                }, CelesteSocket.RETRY_INTERVAL_MS);
             });
         };
         tryConnect();

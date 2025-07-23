@@ -4,10 +4,9 @@ import { CelesteSocket } from "./CelesteSocket";
 import UPNG from "upng-js";
 import { ApplyContext, findEmojiMeaning } from "./EmojiMeaning";
 import { debounce } from "./utils";
-import { getMinimumReactionsRequired, getReactionDebounce } from "./settings";
+import { getMaxFrames, getMinimumReactionsRequired, getReactionDebounce } from "./settings";
 import { getSyncedState, setStateChangeCallback } from "./state";
 import { EventRecorder, EventUser } from "./EventRecorder";
-import { spawn } from "child_process";
 
 class DiscordPlaysCelesteServer {
     private client: Client;
@@ -180,13 +179,13 @@ class DiscordPlaysCelesteServer {
             
             this.latestMessageID = null;
             setTimeout(() => {
-                spawn(process.argv[0], process.argv.slice(1), {
-                    env: { process_restarting: "1" },
-                    stdio: 'ignore',
-                    detached: true
-                }).unref();
+                // spawn(process.argv[0], process.argv.slice(1), {
+                //     env: { process_restarting: "1" },
+                //     stdio: 'ignore',
+                //     detached: true
+                // }).unref();
                 process.exit(1);
-            }, 3000);
+            }, 1000);
         });
 
         process.on("unhandledRejection", (reason, promise) => {
@@ -198,13 +197,13 @@ class DiscordPlaysCelesteServer {
             
             this.latestMessageID = null;
             setTimeout(() => {
-                spawn(process.argv[0], process.argv.slice(1), {
-                    env: { process_restarting: "1" },
-                    stdio: 'ignore',
-                    detached: true
-                }).unref();
+                // spawn(process.argv[0], process.argv.slice(1), {
+                //     env: { process_restarting: "1" },
+                //     stdio: 'ignore',
+                //     detached: true
+                // }).unref();
                 process.exit(1);
-            }, 3000);
+            }, 1000);
         });
     }
 
@@ -292,6 +291,15 @@ class DiscordPlaysCelesteServer {
         });
 
         const advanceData = context.getAdvanceFrameData();
+        const maxFrames = getMaxFrames();
+        if(advanceData.FramesToAdvance > maxFrames) {
+            this.sendToChannel({
+                content: `${advanceData.FramesToAdvance} frames? [Nice one.](https://discord.com/channels/1396648547708829778/1396661370757447680/1396944113743560894)
+Capped to ${maxFrames} frames.`,
+                flags: MessageFlags.SuppressEmbeds
+            });
+            advanceData.FramesToAdvance = maxFrames;
+        }
         this.celesteSocket.sendAdvanceFrame(advanceData);
         
         this.eventRecorder.recordInputHistory(advanceData, contributors);
@@ -342,12 +350,4 @@ class DiscordPlaysCelesteServer {
     }
 }
 
-// TODO: Switch to a proper process manager
-if(process.env.process_restarting) {
-    // Give old process one second to shut down before continuing...
-    setTimeout(() => {
-        new DiscordPlaysCelesteServer();
-    }, 1000);
-} else {
-    new DiscordPlaysCelesteServer();
-}
+new DiscordPlaysCelesteServer();

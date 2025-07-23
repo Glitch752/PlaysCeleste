@@ -1,5 +1,6 @@
 import { AdvanceFrameData } from "./CelesteSocket";
 import { getSyncedState } from "./state";
+import { formatList } from "./utils";
 
 export class ApplyContext {
     public keysHeld: Set<string> = new Set();
@@ -21,11 +22,14 @@ export class ApplyContext {
     }
     
     print(): string {
-        let result = `Moving forward ${this.frames * this.frameMultiplier} frame${this.frames > 0 ? "s" : ""} with `;
+        let frames = this.frames * this.frameMultiplier;
+        let seconds = Math.round(frames / 60 * 1000) / 1000;
+        let readableDuration = `${seconds} second${seconds !== 1 ? "s" : ""}`;
+        let result = `Moving forward ${frames} frame${this.frames > 0 ? "s" : ""} (${readableDuration}) with `;
         if(this.keysHeld.size == 0) {
             result += "no keys held.";
         } else {
-            result += `the following keys held: \`${Array.from(this.keysHeld).join(", ")}\`.`;
+            result += `${formatList(Array.from(this.keysHeld))} held.`;
         }
         return result;
     }
@@ -139,7 +143,7 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.wait("🕚", 11, 0),
     EmojiMeaning.wait("🕦", 11.5, 0),
     EmojiMeaning.wait("🕛", 12, 0),
-    EmojiMeaning.wait("🕧", 12.5, 0),
+    EmojiMeaning.wait("🕧", 0.5, 0),
 ];
 
 export function findEmojiMeaning(name: string | null) {
