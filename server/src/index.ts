@@ -7,6 +7,7 @@ import { debounce } from "./utils";
 import { getMinimumReactionsRequired, getReactionDebounce } from "./settings";
 import { getSyncedState, setStateChangeCallback } from "./state";
 import { EventRecorder, EventUser } from "./EventRecorder";
+import { spawn } from "child_process";
 
 class DiscordPlaysCelesteServer {
     private client: Client;
@@ -34,6 +35,7 @@ class DiscordPlaysCelesteServer {
 
         this.setupCelesteSocketEvents();
         this.setupClientEvents();
+        this.setupSketchyErrorHandling();
 
         this.client.login(config.DISCORD_TOKEN);
     }
@@ -165,6 +167,44 @@ class DiscordPlaysCelesteServer {
 
         this.celesteSocket.on("error", (e) => {
             console.error("Celeste socket error:", e);
+        });
+    }
+    
+    private setupSketchyErrorHandling() {
+        process.on("uncaughtException", (error) => {
+            console.error("Uncaught Exception:", error);
+            this.sendToChannel({
+                content: `<:annoyedeline:1396712320452792452> An error occurred; Discord is probably rate limiting us. Wait a few seconds, and we'll restart the bot. <@601206663059603487> ahhh something went wrong`,
+                flags: MessageFlags.SuppressEmbeds
+            });
+            
+            this.latestMessageID = null;
+            setTimeout(() => {
+                spawn(process.argv[0], process.argv.slice(1), {
+                    env: { process_restarting: "1" },
+                    stdio: 'ignore',
+                    detached: true
+                }).unref();
+                process.exit(1);
+            }, 3000);
+        });
+
+        process.on("unhandledRejection", (reason, promise) => {
+            console.error("Unhandled Rejection at:", promise, "reason:", reason);
+            this.sendToChannel({
+                content: `<:annoyedeline:1396712320452792452> An error occurred; Discord is probably rate limiting us. Wait a few seconds, and we'll restart the bot. <@601206663059603487> ahhh something went wrong`,
+                flags: MessageFlags.SuppressEmbeds
+            });
+            
+            this.latestMessageID = null;
+            setTimeout(() => {
+                spawn(process.argv[0], process.argv.slice(1), {
+                    env: { process_restarting: "1" },
+                    stdio: 'ignore',
+                    detached: true
+                }).unref();
+                process.exit(1);
+            }, 3000);
         });
     }
 
@@ -302,4 +342,12 @@ class DiscordPlaysCelesteServer {
     }
 }
 
-new DiscordPlaysCelesteServer();
+// TODO: Switch to a proper process manager
+if(process.env.process_restarting) {
+    // Give old process one second to shut down before continuing...
+    setTimeout(() => {
+        new DiscordPlaysCelesteServer();
+    }, 1000);
+} else {
+    new DiscordPlaysCelesteServer();
+}
