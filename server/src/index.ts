@@ -1,6 +1,6 @@
 import { AttachmentBuilder, Client, Events, GatewayIntentBits, Message, MessageCreateOptions, MessageFlags, ReactionManager, TextChannel } from "discord.js";
 import { config } from "./config";
-import { CelesteSocket } from "./CelesteSocket";
+import { AdvanceFrameData, CelesteSocket } from "./CelesteSocket";
 import UPNG from "upng-js";
 import { ApplyContext, findEmojiMeaning } from "./EmojiMeaning";
 import { cropImage, debounce } from "./utils";
@@ -137,9 +137,9 @@ class DiscordPlaysCelesteServer {
             
             if(wasCleared && firstClear) {
                 let content = "";
-                content += `### :trophy: **${roomEvent.chapterName} ${roomEvent.toRoomName}** cleared for the first time!\n`;
-                content += `Clear team: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
-                content += "-# Note: clear team or room completion may not be accurate; it's just a heuristic!";
+                content += `### :trophy: **${roomEvent.chapterName} ${roomEvent.toRoomName}** reached for the first time!\n`;
+                content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
+                content += "-# Note: contributors may not be accurate; it's just a heuristic!";
                 
                 this.sendToChannel({
                     content,
@@ -200,7 +200,7 @@ class DiscordPlaysCelesteServer {
         });
     }
 
-    private updateReactions(reactions: ReactionManager) {
+    private async updateReactions(reactions: ReactionManager) {
         // Find all reactions with more than MINIMUM_REACTIONS_REQUIRED reactions
         const validReactions = [...reactions.cache.values()].filter(r => r.count >= getMinimumReactionsRequired());
         if(validReactions.length === 0) {
@@ -238,7 +238,7 @@ class DiscordPlaysCelesteServer {
         this.latestMessageID = null;
 
         // Awesome! Advance frames.
-        this.sendToChannel({
+        const message = await this.sendToChannel({
             content: context.print()
         });
 
@@ -252,9 +252,9 @@ Capped to ${maxFrames} frames.`,
             });
             advanceData.FramesToAdvance = maxFrames;
         }
-        this.celesteSocket.sendAdvanceFrame(advanceData);
         
-        this.eventRecorder.recordInputHistory(advanceData, contributors);
+        this.celesteSocket.sendAdvanceFrame(advanceData);
+        this.eventRecorder.recordInputHistory(advanceData, contributors, message?.id ?? "unknown");
     }
 
     private setupClientEvents() {
@@ -274,10 +274,12 @@ Capped to ${maxFrames} frames.`,
                 this.celesteSocket.updateSyncedState(getSyncedState());
             });
             
-            this.celesteSocket.sendAdvanceFrame({
+            const data: AdvanceFrameData = {
                 KeysHeld: [],
                 FramesToAdvance: 1
-            });
+            };
+            this.celesteSocket.sendAdvanceFrame(data);
+            this.eventRecorder.recordInputHistory(data, []);
         });
 
         this.client.on(Events.MessageReactionAdd, async (reaction, user) => {

@@ -20,7 +20,8 @@ type GameEventData = {
     type: EventType.InputHistory,
     keysHeld: string[],
     frames: number,
-    contributors: EventUser[]
+    contributors: EventUser[],
+    messageId: string
 } | {
     type: EventType.ChangeRoom,
     fromRoomName: string,
@@ -88,12 +89,13 @@ export class EventRecorder {
     /**
      * Records an input history event.
      */
-    recordInputHistory(data: AdvanceFrameData, contributors: EventUser[]) {
+    recordInputHistory(data: AdvanceFrameData, contributors: EventUser[], messageId: string = "") {
         this.record({
             type: EventType.InputHistory,
             keysHeld: data.KeysHeld,
             frames: data.FramesToAdvance,
-            contributors
+            contributors,
+            messageId
         });
         
         for(const user of contributors) {
