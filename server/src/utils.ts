@@ -44,3 +44,44 @@ export class AsyncMutex {
         }
     }
 }
+
+/**
+ * Celeste renders the actual game content in a 16:9 box in the middle of the screen.
+ * If the window isn't exactly 16:9, there are black bars on the sides of the screen that we don't want to send.
+ * This shouldn't happen, but it does in testing.
+ */
+export function cropImage(arrayBuf: ArrayBuffer, width: number, height: number): [ArrayBuffer, number, number] {
+    const aspectRatio = 16 / 9;
+    const targetWidth = Math.floor(height * aspectRatio);
+
+    if(width === targetWidth) return [arrayBuf, width, height]; // Already correct aspect ratio
+
+    if(width > targetWidth) {
+        // Too wide, crop sides
+        const bytesPerPixel = 4; // RGBA
+        const cropX = Math.floor((width - targetWidth) / 2);
+        const cropped = new Uint8Array(targetWidth * height * bytesPerPixel);
+        const src = new Uint8Array(arrayBuf);
+
+        for(let y = 0; y < height; y++) {
+            const srcStart = (y * width + cropX) * bytesPerPixel;
+            const destStart = (y * targetWidth) * bytesPerPixel;
+            cropped.set(src.subarray(srcStart, srcStart + targetWidth * bytesPerPixel), destStart);
+        }
+        return [cropped.buffer, targetWidth, height];
+    } else {
+        // Too narrow, crop top and bottom
+        const bytesPerPixel = 4; // RGBA
+        const targetHeight = Math.floor(width / aspectRatio);
+        const cropY = Math.floor((height - targetHeight) / 2);
+        const cropped = new Uint8Array(width * targetHeight * bytesPerPixel);
+        const src = new Uint8Array(arrayBuf);
+
+        for(let y = 0; y < targetHeight; y++) {
+            const srcStart = ((y + cropY) * width) * bytesPerPixel;
+            const destStart = (y * width) * bytesPerPixel;
+            cropped.set(src.subarray(srcStart, srcStart + width * bytesPerPixel), destStart);
+        }
+        return [cropped.buffer, width, targetHeight];
+    }
+}

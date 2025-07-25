@@ -25,7 +25,7 @@ export class ApplyContext {
         let frames = this.frames * this.frameMultiplier;
         let seconds = Math.round(frames / 60 * 1000) / 1000;
         let readableDuration = `${seconds} second${seconds !== 1 ? "s" : ""}`;
-        let result = `Moving forward ${frames} frame${this.frames > 0 ? "s" : ""} (${readableDuration}) with `;
+        let result = `Moving forward ${frames} frame${this.frames != 1 ? "s" : ""} (${readableDuration}) with `;
         if(this.keysHeld.size == 0) {
             result += "no keys held.";
         } else {

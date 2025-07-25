@@ -144,17 +144,22 @@ export class EventRecorder {
         // Collect the contributors for every room in this chapter
         const chapterContributors: Map<string, EventUser> = new Map();
         
-        for(const user of this.currentContributors) {
-            chapterContributors.set(user.id, user);
-        }
-        
+        // This isn't the most efficient way to do this, but meh.
         for await(const event of this.streamEvents()) {
             if(event.type === EventType.ChangeRoom && event.chapterName === chapterName) {
                 for(const user of event.contributors) {
                     chapterContributors.set(user.id, user);
                 }
             }
+            if(event.type === EventType.CompleteChapter && event.chapterName === chapterName) {
+                // We only want the most recent completion's data
+                chapterContributors.clear();
+            }
             eventCallback?.(event);
+        }
+        
+        for(const user of this.currentContributors) {
+            chapterContributors.set(user.id, user);
         }
         
         return Array.from(chapterContributors.values());
