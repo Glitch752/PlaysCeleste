@@ -1,4 +1,5 @@
 using Celeste.Mod.mod;
+using Microsoft.Xna.Framework.Graphics;
 using Monocle;
 
 public static class ScreenshotFrame {
@@ -17,9 +18,6 @@ public static class ScreenshotFrame {
             self.scene.BeforeRender();
         }
 
-        int width = self.GraphicsDevice.PresentationParameters.BackBufferWidth;
-        int height = self.GraphicsDevice.PresentationParameters.BackBufferHeight;
-
         self.GraphicsDevice.SetRenderTarget(null);
         self.GraphicsDevice.Viewport = Engine.Viewport;
 
@@ -31,10 +29,17 @@ public static class ScreenshotFrame {
         }
 
         if(GameState.Instance.shouldScreenshot) {
-            byte[] data = new byte[width * height * 4];
-            self.GraphicsDevice.GetBackBufferData(data, 0, width * height * 4);
-
-            SocketConnection.SendFrame(data, width, height);   
+            SendScreenshotToServer(self.GraphicsDevice); 
         }
+    }
+    
+    public static void SendScreenshotToServer(GraphicsDevice GraphicsDevice) {
+        int width = GraphicsDevice.PresentationParameters.BackBufferWidth;
+        int height = GraphicsDevice.PresentationParameters.BackBufferHeight;
+
+        byte[] data = new byte[width * height * 4];
+        GraphicsDevice.GetBackBufferData(data, 0, width * height * 4);
+
+        SocketConnection.SendFrame(data, width, height);
     }
 }

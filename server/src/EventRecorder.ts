@@ -8,7 +8,8 @@ enum EventType {
     CompleteChapter = "completeChapter",
     CollectStrawberry = "collectStrawberry",
     Death = "death",
-    Message = "message"
+    Message = "message",
+    SetControlledChapter = "setControlledChapter"
 }
 
 export type EventUser = {
@@ -49,6 +50,9 @@ type GameEventData = {
 } | {
     type: EventType.Message,
     content: string
+} | {
+    type: EventType.SetControlledChapter,
+    chapter: string | null
 };
 
 export type ChangeRoomResult = {
@@ -106,6 +110,17 @@ export class EventRecorder {
     }
     
     /**
+     * Sets the chapter that is currently being controlled.  
+     * This is used to determine which chapter events are for.
+     */
+    setControlledChapter(chapter: string | null) {
+        this.record({
+            type: EventType.SetControlledChapter,
+            chapter
+        });
+    }
+    
+    /**
      * Run when the room is changed.  
      * Returns if this was the first time we've entered the new room and a list of contributor IDs.
      */
@@ -115,7 +130,7 @@ export class EventRecorder {
         for await(const event of this.streamEvents()) {
             console.log(event);
             if(event.type === EventType.ChangeRoom) {
-                if(event.toRoomName === toRoomName && event.chapterName === chapterName) {
+                if(event.toRoomName === toRoomName || event.fromRoomName === toRoomName && event.chapterName === chapterName) {
                     firstEnter = false;
                 }
                 if(event.fromRoomName === fromRoomName && event.chapterName === chapterName && event.wasCleared) {

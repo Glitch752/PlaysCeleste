@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using Celeste.Mod;
@@ -52,9 +53,25 @@ public class GameState {
     }
     
     /// <summary>
+    /// The state that is synchronized from the server.  
+    /// Access syncedState instead for thread safety.
+    /// </summary>
+    private SyncedState _syncedState = new SyncedState();
+    /// <summary>
     /// The state that is synchronized from the server.
     /// </summary>
-    public SyncedState syncedState = new SyncedState();
+    public SyncedState syncedState {
+        get {
+            lock(_syncedState) {
+                return _syncedState;
+            }
+        }
+        set {
+            lock(_syncedState) {
+                _syncedState = value;
+            }
+        }
+    }
     
     public GameState() {
         Instance = this;
@@ -73,31 +90,20 @@ public class GameState {
     }
     
     public void Update(GameTime gameTime) {
-        if(!syncedState.ControlledByDiscord) {
-            SocketConnection.ConsumeUpdatesNonblocking();
-            if(!syncedState.ControlledByDiscord) { // We may have just switched to Discord control
+        while(framesToAdvanceRemaining <= 0) {
+            if(!syncedState.ControlledByDiscord) {
                 UpdateManualControl(gameTime);
-                return;
-            }
-        }
-        
-        if(framesToAdvanceRemaining <= 0) {
-            // If we shouldn't run another frame, wait until the server tells us to
-            SocketConnection.FrameAdvanceData data = SocketConnection.WaitForFrameAdvance();
-            if(data == null) {
-                "Failed to deserialize frame data.".Log(LogLevel.Error);
                 return;
             }
             
-            if(!syncedState.ControlledByDiscord) {
-                $"Game is not controlled by Discord, ignoring frame advance request.".Log(LogLevel.Info);
-                UpdateManualControl(gameTime);
-                return;
-            }
+            // If we shouldn't run another frame, wait until the server tells us to
+            SocketConnection.FrameAdvanceData data = SocketConnection.BlockUntilFrameAdvance();
             
             if(data.FramesToAdvance == 0) {
-                "Cannot advance 0 frames.".Log(LogLevel.Error);
-                return;
+                // Immediately send back a screenshot
+                $"Received frame advance request with 0 frames to advance, sending screenshot.".Log(LogLevel.Verbose);
+                ScreenshotFrame.SendScreenshotToServer(Engine.Instance.GraphicsDevice);
+                continue;
             }
             
             framesToAdvanceRemaining = data.FramesToAdvance;
@@ -113,9 +119,7 @@ public class GameState {
             }
         }
         
-        if(framesToAdvanceRemaining > 0 && framesToAdvanceRemaining % 1000 == 0) {
-            SocketConnection.SendMessage($"I'm still working on it... {framesToAdvanceRemaining} frames remaining");
-        }
+        UpdateMInputState();
         
         framesToAdvanceRemaining -= 1;
         
@@ -125,5 +129,16 @@ public class GameState {
         TimeSpan delta = new TimeSpan(166667); // 60 FPS
         SimulatedTimeTicks += delta.Ticks;
         simulatedGameTime = new GameTime(new TimeSpan(SimulatedTimeTicks), delta, false);
+    }
+    
+    private void UpdateMInputState() {
+        MInput.Keyboard.PreviousState = MInput.Keyboard.CurrentState;
+        
+        KeyboardState state = new KeyboardState(Instance.heldKeys.ToArray());
+        MInput.Keyboard.CurrentState = state;
+        
+        MInput.UpdateVirtualInputs();
+        
+        $"{MInput.Keyboard.Check(Keys.Right)}".Log();
     }
 }

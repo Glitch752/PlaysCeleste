@@ -1,23 +1,23 @@
 using System;
-using System.Net.Sockets;
+using System.Collections.Concurrent;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Threading;
 using Celeste.Mod;
 using Celeste.Mod.mod;
 
 public static class SocketConnection {
-    private static Socket socket;
+    private static ConcurrentSocket socket;
     private static readonly string SocketPath = "/tmp/discord-plays-celeste.sock";
-    private static readonly object socketLock = new object();
+    private static readonly ConcurrentQueue<FrameAdvanceData> frameAdvanceEvents = new();
 
     [Initialize]
     private static void Initialize() {
-        EnsureConnected();
+        socket = new ConcurrentSocket(SocketPath, OnMessageReceived);
     }
 
     [Unload]
     private static void Unload() {
-        CloseSocket();
+        if(socket != null) socket.Close();
     }
 
     private enum ServerToCelesteMessageType {
@@ -35,6 +35,7 @@ public static class SocketConnection {
         }
     }
     
+    #nullable enable
     public class StrawberryCollectedEvent {
         public string roomName { get; set; }
         public string chapterName { get; set; }
@@ -81,6 +82,15 @@ public static class SocketConnection {
             this.chapterName = chapterName;
         }
     }
+    
+    public class SetControlledChapterEvent {
+        public string? chapter { get; set; }
+        
+        public SetControlledChapterEvent(string? chapter) {
+            this.chapter = chapter;
+        }
+    }
+    #nullable disable
 
     private enum CelesteToServerMessageType {
         Frame = 0x01,
@@ -88,245 +98,90 @@ public static class SocketConnection {
         PlayerDeath = 0x03,
         StrawberryCollected = 0x04,
         ChangeRoom = 0x05,
-        CompleteChapter = 0x06
+        CompleteChapter = 0x06,
+        SetControlledChapter = 0x07
     }
-
-    private static void EnsureConnected() {
-        lock(socketLock) {
-            if(socket == null || !socket.Connected) {
-                Reconnect();
+    
+    public static void OnMessageReceived(ConcurrentSocket.SocketMessage message) {
+        ServerToCelesteMessageType messageType = (ServerToCelesteMessageType)message.messageType;
+        byte[] payload = message.payload;
+        
+        if(!GameState.Instance.syncedState.ControlledByDiscord) {
+            if(messageType != ServerToCelesteMessageType.UpdateSyncedState) {
+                // This isn't an update message, but we need to consume it to avoid blocking future messages
+                $"Received unexpected message type while not controlled by Discord: {messageType}".Log(LogLevel.Error);
+                return;
             }
-        }
-    }
-
-    private static void ConnectToSocket() {
-        // Always delete the socket file before binding
-        if(System.IO.File.Exists(SocketPath)) {
+            
+            // We have an update message
+            string json = System.Text.Encoding.UTF8.GetString(payload);
             try {
-                System.IO.File.Delete(SocketPath);
-            } catch(Exception e) {
-                $"Failed to delete existing socket file: {e.Message}".Log(LogLevel.Error);
+                GameState.SyncedState state = JsonSerializer.Deserialize<GameState.SyncedState>(json);
+                GameState.Instance.syncedState = state;
+            } catch(JsonException e) {
+                $"Failed to deserialize synced state: {e.Message}".Log(LogLevel.Error);
             }
-        }
-
-        socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
-        var ep = new UnixDomainSocketEndPoint(SocketPath);
-
-        try {
-            socket.Bind(ep);
-            socket.Listen(1);
-
-            "Waiting for server socket connection...".Log();
-            socket = socket.Accept();
-            "Server socket connected.".Log();
-            GameState.Instance.Reset();
-        } catch(SocketException e) {
-            $"Socket connection failed: {e.Message}".Log(LogLevel.Error);
-            CloseSocket();
-        }
-    }
-
-    private static void CloseSocket() {
-        lock(socketLock) {
-            if(socket != null) {
-                try {
-                    socket.Close();
-                } catch { }
-                socket = null;
-            }
-            // Clean up socket file
-            if(System.IO.File.Exists(SocketPath)) {
-                try {
-                    System.IO.File.Delete(SocketPath);
-                } catch (Exception e) {
-                    $"Failed to delete socket file on close: {e.Message}".Log(LogLevel.Error);
-                }
-            }
-        }
-    }
-
-    private static void Send(CelesteToServerMessageType messageType, byte[] payload, byte[] extraHeader = null) {
-        EnsureConnected();
-        if(socket == null || !socket.Connected) {
             return;
         }
-
-        int headerLength = 1 + 4 + (extraHeader?.Length ?? 0);
-        byte[] header = new byte[headerLength];
-        header[0] = (byte)messageType;
-        BitConverter.GetBytes(payload.Length + (extraHeader?.Length ?? 0)).CopyTo(header, 1);
-
-        if(extraHeader != null) {
-            Buffer.BlockCopy(extraHeader, 0, header, 5, extraHeader.Length);
-        }
-
-        try {
-            socket.Send(header);
-            socket.Send(payload);
-        } catch (SocketException e) {
-            $"Failed to send data: {e.Message}".Log(LogLevel.Error);
-            Reconnect();
-        }
-    }
-
-    private static void Reconnect() {
-        CloseSocket();
-        ConnectToSocket();
-    }
-    
-    /// <summary>
-    /// Returns true and updates the state if there has been a synced state update, but returns immediately if no update is available.
-    /// </summary>
-    public static bool ConsumeUpdatesNonblocking() {
-        EnsureConnected();
-        if(socket == null || !socket.Connected) {
-            return false;
-        }
-    
-        if(socket.Available < 5) {
-            // No data available
-            return false;
-        }
-    
-        byte[] header = new byte[5];
-        try {
-            int received = socket.Receive(header, 5, SocketFlags.None);
-            if(received < 5) {
-                // No data available
-                return false;
-            }
-        } catch(SocketException e) {
-            $"Failed to peek data: {e.Message}".Log(LogLevel.Error);
-            Reconnect();
-            return false;
-        }
         
-        ServerToCelesteMessageType messageType = (ServerToCelesteMessageType)header[0];
-        byte[] payloadLengthBytes = new byte[4];
-        Array.Copy(header, 1, payloadLengthBytes, 0, 4);
-        int payloadLength = BitConverter.ToInt32(payloadLengthBytes, 0);
-        byte[] payload = new byte[payloadLength];
-        try {
-            int received = socket.Receive(payload, payload.Length, SocketFlags.None);
-            if(received < payloadLength) {
-                "Received incomplete payload.".Log(LogLevel.Error);
-                Reconnect();
-                return false;
-            }
-        } catch(SocketException e) {
-            $"Failed to receive data: {e.Message}".Log(LogLevel.Error);
-            Reconnect();
-        }
-        
-        if(messageType != ServerToCelesteMessageType.UpdateSyncedState) {
-            // This isn't an update message, but we need to consume it to avoid blocking future messages
-            $"Received unexpected message type while consuming nonblocking: {messageType}".Log(LogLevel.Error);
-            return false;
-        }
-        
-        // We have an update message
-        string json = System.Text.Encoding.UTF8.GetString(payload);
-        try {
-            GameState.SyncedState state = JsonSerializer.Deserialize<GameState.SyncedState>(json);
-            GameState.Instance.syncedState = state;
-        } catch(JsonException e) {
-            $"Failed to deserialize synced state: {e.Message}".Log(LogLevel.Error);
-            return false;
-        }
-        return true;
-    }
-
-    public static FrameAdvanceData WaitForFrameAdvance() {
-        while(true) {
-            EnsureConnected();
-            if(socket == null || !socket.Connected) {
-                return null;
-            }
-
-            byte[] header = new byte[5];
-            try {
-                int received = socket.Receive(header, 5, SocketFlags.None);
-                if(received < 5) {
-                    "Received invalid header length.".Log(LogLevel.Error);
-                    Reconnect();
-                    continue;
+        switch(messageType) {
+            case ServerToCelesteMessageType.AdvanceFrame: {
+                string json = System.Text.Encoding.UTF8.GetString(payload);
+                FrameAdvanceData frameData = JsonSerializer.Deserialize<FrameAdvanceData>(json);
+                if(frameData != null) {
+                    frameAdvanceEvents.Enqueue(frameData);
+                } else {
+                    "Failed to deserialize frame advance data.".Log(LogLevel.Error);
                 }
-            } catch(SocketException e) {
-                $"Failed to receive data: {e.Message}".Log(LogLevel.Error);
-                Reconnect();
-                continue;
+                return;
             }
-
-            ServerToCelesteMessageType messageType = (ServerToCelesteMessageType)header[0];
-            int payloadLength = BitConverter.ToInt32(header, 1);
-
-            byte[] payload = new byte[payloadLength];
-            try {
-                int received = socket.Receive(payload, payload.Length, SocketFlags.None);
-                if(received < payloadLength) {
-                    "Received incomplete payload.".Log(LogLevel.Error);
-                    Reconnect();
-                    continue;
+            case ServerToCelesteMessageType.UpdateSyncedState: {
+                string json = System.Text.Encoding.UTF8.GetString(payload);
+                GameState.SyncedState state = JsonSerializer.Deserialize<GameState.SyncedState>(json);
+                GameState.Instance.syncedState = state;
+                if(!state.ControlledByDiscord) {
+                    frameAdvanceEvents.Enqueue(new FrameAdvanceData());
                 }
-            } catch(SocketException e) {
-                $"Failed to receive payload: {e.Message}".Log(LogLevel.Error);
-                Reconnect();
-                continue;
+                return;
             }
-
-            switch(messageType) {
-                case ServerToCelesteMessageType.AdvanceFrame: {
-                    string json = System.Text.Encoding.UTF8.GetString(payload);
-                    FrameAdvanceData frameData = JsonSerializer.Deserialize<FrameAdvanceData>(json);
-                    return frameData;
-                }
-                case ServerToCelesteMessageType.UpdateSyncedState: {
-                    string json = System.Text.Encoding.UTF8.GetString(payload);
-                    GameState.SyncedState state = JsonSerializer.Deserialize<GameState.SyncedState>(json);
-                    GameState.Instance.syncedState = state;
-                    if(!state.ControlledByDiscord) {
-                        return new FrameAdvanceData();
-                    }
-                    continue;
-                }
-                default:
-                    $"Unknown message type: {messageType}".Log(LogLevel.Error);
-                    return null;
-            }
+            default:
+                $"Unknown message type: {messageType}".Log(LogLevel.Error);
+                return;
         }
     }
 
     public static void SendMessage(string message) {
         byte[] data = System.Text.Encoding.UTF8.GetBytes(message);
-        Send(CelesteToServerMessageType.Message, data);
+        socket.Send((byte)CelesteToServerMessageType.Message, data);
     }
 
     public static void SendFrame(byte[] rgbaFrameData, int width, int height) {
         byte[] extraHeader = new byte[8];
         BitConverter.GetBytes(width).CopyTo(extraHeader, 0);
         BitConverter.GetBytes(height).CopyTo(extraHeader, 4);
-        Send(CelesteToServerMessageType.Frame, rgbaFrameData, extraHeader);
+        socket.Send((byte)CelesteToServerMessageType.Frame, rgbaFrameData, extraHeader);
     }
     
     public static void SendPlayerDeath() {
-        Send(CelesteToServerMessageType.PlayerDeath, []);
+        socket.Send((byte)CelesteToServerMessageType.PlayerDeath, []);
     }
     
-    public static void SendStrawberryCollected(StrawberryCollectedEvent strawberryEvent) {
-        string json = JsonSerializer.Serialize(strawberryEvent);
+    private static void SendEvent<T>(CelesteToServerMessageType messageType, T eventData) {
+        string json = JsonSerializer.Serialize(eventData);
         byte[] data = System.Text.Encoding.UTF8.GetBytes(json);
-        Send(CelesteToServerMessageType.StrawberryCollected, data);
+        socket.Send((byte)messageType, data);
     }
+
+    public static void SendStrawberryCollected(StrawberryCollectedEvent ev) => SendEvent(CelesteToServerMessageType.StrawberryCollected, ev);
+    public static void SendChangeRoom(ChangeRoomEvent ev) => SendEvent(CelesteToServerMessageType.ChangeRoom, ev);
+    public static void SendCompleteChapter(CompleteChapterEvent ev) => SendEvent(CelesteToServerMessageType.CompleteChapter, ev);
+    public static void SendSetControlledChapter(SetControlledChapterEvent ev) => SendEvent(CelesteToServerMessageType.SetControlledChapter, ev);
     
-    public static void SendChangeRoom(ChangeRoomEvent changeRoomEvent) {
-        string json = JsonSerializer.Serialize(changeRoomEvent);
-        byte[] data = System.Text.Encoding.UTF8.GetBytes(json);
-        Send(CelesteToServerMessageType.ChangeRoom, data);
-    }
-    
-    public static void SendCompleteChapter(CompleteChapterEvent completeChapterEvent) {
-        string json = JsonSerializer.Serialize(completeChapterEvent);
-        byte[] data = System.Text.Encoding.UTF8.GetBytes(json);
-        Send(CelesteToServerMessageType.CompleteChapter, data);
+    public static FrameAdvanceData BlockUntilFrameAdvance() {
+        FrameAdvanceData data;
+        while(!frameAdvanceEvents.TryDequeue(out data)) {
+            Thread.Sleep(10); // Avoid busy-waiting
+        }
+        return data;
     }
 }

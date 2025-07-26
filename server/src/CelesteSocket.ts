@@ -20,7 +20,8 @@ export enum CelesteToServerMessageType {
     PlayerDeath = 0x03,
     StrawberryCollected = 0x04,
     ChangeRoom = 0x05,
-    CompleteChapter = 0x06
+    CompleteChapter = 0x06,
+    SetControlledChapter = 0x07
 }
 
 export type FrameEvent = {
@@ -49,6 +50,10 @@ export type CompleteChapterEvent = {
     chapterName: string;
 };
 
+export type SetControlledChapterEvent = {
+    chapter: string | null;
+};
+
 type CelesteEventMap = {
     connect: [];
     close: [];
@@ -59,6 +64,7 @@ type CelesteEventMap = {
     strawberryCollected: [StrawberryCollectedEvent];
     changeRoom: [ChangeRoomEvent];
     completeChapter: [CompleteChapterEvent];
+    setControlledChapter: [SetControlledChapterEvent];
 };
 
 export class CelesteSocket extends EventEmitter<CelesteEventMap> {
@@ -125,7 +131,7 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
         this.recvBuffer = Buffer.concat([this.recvBuffer, chunk]);
         
         // Process as many complete messages as are buffered
-        while (this.recvBuffer.length >= 5) {
+        while(this.recvBuffer.length >= 5) {
             const type = this.recvBuffer.readUInt8(0);
             const length = this.recvBuffer.readUInt32LE(1);
             const total = 5 + length;
@@ -135,7 +141,7 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
             const payload = this.recvBuffer.subarray(5, total);
             this.recvBuffer = this.recvBuffer.subarray(total);
             
-            switch (type) {
+            switch(type) {
                 case CelesteToServerMessageType.ScreenshotData: {
                     // First 8 bytes are width and height
                     const width = payload.readUInt32LE(0);
@@ -167,6 +173,11 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
                 case CelesteToServerMessageType.CompleteChapter: {
                     const json = JSON.parse(payload.toString("utf8"));
                     this.emit("completeChapter", json as CompleteChapterEvent);
+                    break;
+                }
+                case CelesteToServerMessageType.SetControlledChapter: {
+                    const json = JSON.parse(payload.toString("utf8"));
+                    this.emit("setControlledChapter", json as SetControlledChapterEvent);
                     break;
                 }
                 default:

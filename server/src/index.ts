@@ -165,6 +165,12 @@ class DiscordPlaysCelesteServer {
                 flags: MessageFlags.SuppressEmbeds
             });
         });
+        
+        this.celesteSocket.on("setControlledChapter", (event) => {
+            if(event.chapter != null) console.log(`Set controlled chapter to ${event.chapter}`);
+            else console.log("Cleared controlled chapter");
+            this.eventRecorder.setControlledChapter(event.chapter);
+        });
 
         this.celesteSocket.on("close", () => {
             console.log("Disconnected from Celeste");
@@ -269,17 +275,32 @@ Capped to ${maxFrames} frames.`,
                 }
             }
 
-            this.celesteSocket.updateSyncedState(getSyncedState());
+            const syncedState = getSyncedState();
+            this.celesteSocket.updateSyncedState(syncedState);
+            let previousControlledByDiscord = syncedState.ControlledByDiscord;
+            
             setStateChangeCallback(() => {
-                this.celesteSocket.updateSyncedState(getSyncedState());
+                const syncedState = getSyncedState();
+                this.celesteSocket.updateSyncedState(syncedState);
+                
+                if(!previousControlledByDiscord && syncedState.ControlledByDiscord) {
+                    const data: AdvanceFrameData = {
+                        KeysHeld: [],
+                        FramesToAdvance: 0 // Just screenshot
+                    };
+                    this.celesteSocket.sendAdvanceFrame(data);   
+                }
+                previousControlledByDiscord = syncedState.ControlledByDiscord;
             });
             
-            const data: AdvanceFrameData = {
-                KeysHeld: [],
-                FramesToAdvance: 1
-            };
-            this.celesteSocket.sendAdvanceFrame(data);
-            this.eventRecorder.recordInputHistory(data, []);
+            if(syncedState.ControlledByDiscord) {
+                const data: AdvanceFrameData = {
+                    KeysHeld: [],
+                    FramesToAdvance: 0 // Just screenshot
+                };
+                this.celesteSocket.sendAdvanceFrame(data);
+            }
+            // this.eventRecorder.recordInputHistory(data, []);
         });
 
         this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
