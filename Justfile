@@ -4,5 +4,8 @@ build:
 run:
     ./celeste/Celeste --console
 
+run-forever:
+    bash ./runCelesteForever.sh
+
 server:
     cd server && pnpm run dev
