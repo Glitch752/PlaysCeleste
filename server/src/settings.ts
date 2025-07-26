@@ -4,12 +4,14 @@ interface Settings {
     MINIMUM_REACTIONS_REQUIRED: number;
     REACTION_DEBOUNCE: number;
     MAX_FRAMES: number;
+    LOG_DEATHS: boolean;
 }
 
 let settings = new PersistentData<Settings>({
     MINIMUM_REACTIONS_REQUIRED: 1,
     REACTION_DEBOUNCE: 5,
-    MAX_FRAMES: 1000
+    MAX_FRAMES: 1000,
+    LOG_DEATHS: true
 }, "settings.json");
 
 export function getMinimumReactionsRequired() {
@@ -22,4 +24,8 @@ export function getReactionDebounce() {
 
 export function getMaxFrames() {
     return settings.data.MAX_FRAMES;
+}
+
+export function shouldLogDeaths() {
+    return settings.data.LOG_DEATHS;
 }

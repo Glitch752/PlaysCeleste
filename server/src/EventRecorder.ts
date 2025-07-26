@@ -25,7 +25,7 @@ type GameEventData = {
     messageId: string
 } | {
     type: EventType.ChangeRoom,
-    fromRoomName: string,
+    fromRoomName: string | null,
     toRoomName: string,
     chapterName: string,
     wasCleared: boolean,
@@ -46,7 +46,8 @@ type GameEventData = {
     idKey: string
 } | {
     type: EventType.Death,
-    contributors: EventUser[]
+    contributors: EventUser[],
+    newDeathCount: number
 } | {
     type: EventType.Message,
     content: string
@@ -76,6 +77,7 @@ type GameEvent = GameEventData & {
 
 export class EventRecorder {
     currentContributors: EventUser[] = [];
+    previousRoomContributors: Map<string, EventUser[]> = new Map();
     
     filePath: string;
     fileHandle: number;
@@ -124,11 +126,10 @@ export class EventRecorder {
      * Run when the room is changed.  
      * Returns if this was the first time we've entered the new room and a list of contributor IDs.
      */
-    async changeRoom(fromRoomName: string, toRoomName: string, chapterName: string): Promise<ChangeRoomResult> {
+    async changeRoom(fromRoomName: string | null, toRoomName: string, chapterName: string): Promise<ChangeRoomResult> {
         let firstEnter = true;
         let firstClear = true;
         for await(const event of this.streamEvents()) {
-            console.log(event);
             if(event.type === EventType.ChangeRoom) {
                 if(event.toRoomName === toRoomName || event.fromRoomName === toRoomName && event.chapterName === chapterName) {
                     firstEnter = false;
@@ -148,7 +149,11 @@ export class EventRecorder {
             wasCleared: firstEnter
         });
         const contributorIDs = this.currentContributors.map(user => user.id);
-        this.clearContributors();
+        
+        if(fromRoomName != null) {
+            this.previousRoomContributors.set(fromRoomName, this.currentContributors);
+        }
+        this.currentContributors = [];
         
         return {
             wasCleared: firstClear,
@@ -200,7 +205,9 @@ export class EventRecorder {
             chapterName,
             contributors
         });
-        this.clearContributors();
+        
+        this.currentContributors = [];
+        this.previousRoomContributors.clear();
         
         return [firstCompletion, contributors.map(user => user.id)];
     }
@@ -212,7 +219,7 @@ export class EventRecorder {
     async collectStrawberry(celesteEvent: StrawberryCollectedEvent): Promise<string[]> {
         const contributors = celesteEvent.isGolden ?
             (await this.getChapterContributors(celesteEvent.chapterName))
-            : this.currentContributors;
+            : this.previousRoomContributors.get(celesteEvent.roomName) ?? this.currentContributors;
         
         this.record({
             type: EventType.CollectStrawberry,
@@ -232,10 +239,11 @@ export class EventRecorder {
     /**
      * Run when the player dies.
      */
-    playerDeath() {
+    playerDeath(newDeathCount: number) {
         this.record({
             type: EventType.Death,
-            contributors: this.currentContributors
+            contributors: this.currentContributors,
+            newDeathCount
         });
     }
     
@@ -248,13 +256,6 @@ export class EventRecorder {
             type: EventType.Message,
             content
         });
-    }
-    
-    /**
-     * Clears the current contributors.
-     */
-    private clearContributors() {
-        this.currentContributors = [];
     }
     
     record(event: GameEventData) {

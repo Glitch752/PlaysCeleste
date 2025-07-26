@@ -4,14 +4,15 @@ import { debounce } from "./utils";
 
 export class PersistentData<T extends object> {
     public data: T;
+    private handler: ProxyHandler<T>;
     private filePath: string;
     private callbacks: ((data: T) => void)[] = [];
     private callbackDebounce = debounce(() => {
         this.callbacks.forEach(callback => callback(this.data));
-    }, () => 100);
+    }, () => 10);
     
     constructor(defaultData: T, fileName: string) {
-        const handler: ProxyHandler<T> = {
+        this.handler = {
             set: (target, prop, value) => {
                 if(target[prop as keyof T] !== value) {
                     target[prop as keyof T] = value;
@@ -25,7 +26,7 @@ export class PersistentData<T extends object> {
             }
         };
         
-        this.data = new Proxy(defaultData, handler);
+        this.data = new Proxy(defaultData, this.handler);
         this.filePath = path.resolve(__dirname, "..", "data", fileName);
 
         this.load();
@@ -55,7 +56,10 @@ export class PersistentData<T extends object> {
                 }
             }
             // Merge with existing data
-            this.data = { ...this.data, ...parsed };
+            this.data = new Proxy({
+                ...this.data,
+                ...parsed
+            }, this.handler);
             this.callbackDebounce();
             console.log(`Data loaded from ${this.filePath}`);
         } catch (err) {

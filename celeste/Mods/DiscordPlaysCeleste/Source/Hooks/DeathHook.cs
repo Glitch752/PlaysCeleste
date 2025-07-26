@@ -1,19 +1,27 @@
+using Celeste;
 using Celeste.Mod.mod;
+using Microsoft.Xna.Framework;
 
 public static class DeathHook {
     [Load]
     private static void Load() {
-        On.Celeste.SaveData.AddDeath += AddDeath;
+        On.Celeste.Player.Die += Die;
     }
 
     [Unload]
     private static void Unload() {
-        On.Celeste.SaveData.AddDeath -= AddDeath;
+        On.Celeste.Player.Die -= Die;
     }
     
-    private static void AddDeath(On.Celeste.SaveData.orig_AddDeath orig, Celeste.SaveData self, Celeste.AreaKey area) {
-        SocketConnection.SendPlayerDeath();
+    private static Celeste.PlayerDeadBody Die(
+        On.Celeste.Player.orig_Die orig,
+        Player self,
+        Vector2 direction, bool evenIfInvincible, bool registerDeathInStats
+    ) {
+        var body = orig(self, direction, evenIfInvincible, registerDeathInStats);
         
-        orig(self, area);
+        SocketConnection.SendPlayerDeath(new SocketConnection.DeathEvent(SaveData.Instance.TotalDeaths));
+        
+        return body;
     }
 }

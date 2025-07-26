@@ -4,18 +4,25 @@ import { AdvanceFrameData, CelesteSocket } from "./CelesteSocket";
 import UPNG from "upng-js";
 import { ApplyContext, findEmojiMeaning } from "./EmojiMeaning";
 import { cropImage, debounce } from "./utils";
-import { getMaxFrames, getMinimumReactionsRequired, getReactionDebounce } from "./settings";
+import { getMaxFrames, getMinimumReactionsRequired, getReactionDebounce, shouldLogDeaths } from "./settings";
 import { getSyncedState, setStateChangeCallback } from "./state";
 import { EventRecorder, EventUser } from "./EventRecorder";
+import { DescriptionManager } from "./DescriptionManager";
 
 class DiscordPlaysCelesteServer {
     private client: Client;
-    private celesteSocket: CelesteSocket;
-    private framesReceived = 0;
-    private celesteConnected = false;
     private latestMessageID: string | null = null;
+
+    private celesteSocket: CelesteSocket;
+    private celesteConnected = false;
+    private initializedDiscord = false;
+
+    private framesReceived = 0;
+
     private reactionsFinishedDebounce: (reactions: ReactionManager) => void;
+
     private eventRecorder: EventRecorder;
+    private descriptionManager: DescriptionManager;
 
     constructor() {
         this.eventRecorder = new EventRecorder();
@@ -25,8 +32,9 @@ class DiscordPlaysCelesteServer {
                 GatewayIntentBits.Guilds,
                 GatewayIntentBits.GuildMessages,
                 GatewayIntentBits.GuildMessageReactions
-            ],
+            ]
         });
+        this.descriptionManager = new DescriptionManager(this.client);
 
         this.celesteSocket = new CelesteSocket();
 
@@ -46,18 +54,15 @@ class DiscordPlaysCelesteServer {
         }
         return null;
     }
-    
-    private async setChannelDescription(description: string): Promise<void> {
-        const channel = this.client.channels.cache.get(config.CHANNEL_ID);
-        if(channel && channel.isTextBased()) {
-            await (channel as TextChannel).setTopic(description);
-        }
-    }
 
     private setupCelesteSocketEvents() {
         this.celesteSocket.once("connect", () => {
             console.log("Connected to Celeste!");
             this.celesteConnected = true;
+            
+            if(this.initializedDiscord) {
+                this.initCeleste();
+            }
         });
 
         this.celesteSocket.on("screenshotData", async (frame) => {
@@ -72,7 +77,9 @@ class DiscordPlaysCelesteServer {
             const pngBuffer = Buffer.from(pngArrayBuffer);
 
             const message = await this.sendToChannel({
-                content: "Here's a screenshot of the game! See <#1396661382782517401> for how to play.",
+                content: `${this.descriptionManager.getDescription()}
+
+Here's the latest screenshot of the game. See <#1396661382782517401> for how to play.`,
                 files: [new AttachmentBuilder(pngBuffer, {
                     name: "celeste.png"
                 })]
@@ -82,6 +89,8 @@ class DiscordPlaysCelesteServer {
             } else {
                 console.error("Failed to send message!");
             }
+            
+            this.descriptionManager.addTurn();
         });
 
         this.celesteSocket.on("message", (msg) => {
@@ -95,12 +104,15 @@ class DiscordPlaysCelesteServer {
             this.eventRecorder.recordMessage(msg);
         });
         
-        this.celesteSocket.on("playerDeath", () => {
-            this.sendToChannel({
-                content: "<:annoyedeline:1396712320452792452> Madeline died",
-                flags: MessageFlags.SuppressEmbeds
-            });
-            this.eventRecorder.playerDeath();
+        this.celesteSocket.on("playerDeath", (event) => {
+            if(shouldLogDeaths()) {
+                this.sendToChannel({
+                    content: "<:annoyedeline:1396712320452792452> Madeline died",
+                    flags: MessageFlags.SuppressEmbeds
+                });
+            }
+            this.eventRecorder.playerDeath(event.newDeathCount);
+            this.descriptionManager.onDeath(event.newDeathCount);
         });
         
         this.celesteSocket.on("strawberryCollected", async (event) => {
@@ -122,6 +134,7 @@ class DiscordPlaysCelesteServer {
                 content,
                 flags: MessageFlags.SuppressEmbeds
             });
+            this.descriptionManager.setStrawberryCount(event.newStrawberryCount);
         });
         
         this.celesteSocket.on("changeRoom", async (roomEvent) => {
@@ -135,7 +148,7 @@ class DiscordPlaysCelesteServer {
                 roomEvent.chapterName
             );
             
-            if(wasCleared && firstClear) {
+            if(roomEvent.fromRoomName != null && wasCleared && firstClear) {
                 let content = "";
                 content += `### :trophy: **${roomEvent.chapterName} ${roomEvent.toRoomName}** reached for the first time!\n`;
                 content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
@@ -146,6 +159,8 @@ class DiscordPlaysCelesteServer {
                     flags: MessageFlags.SuppressEmbeds
                 });
             }
+            
+            this.descriptionManager.setRoom(roomEvent.toRoomName);
         });
         
         this.celesteSocket.on("completeChapter", async (chapterEvent) => {
@@ -170,6 +185,7 @@ class DiscordPlaysCelesteServer {
             if(event.chapter != null) console.log(`Set controlled chapter to ${event.chapter}`);
             else console.log("Cleared controlled chapter");
             this.eventRecorder.setControlledChapter(event.chapter);
+            this.descriptionManager.setChapter(event.chapter);
         });
 
         this.celesteSocket.on("close", () => {
@@ -263,9 +279,22 @@ Capped to ${maxFrames} frames.`,
         this.eventRecorder.recordInputHistory(advanceData, contributors, message?.id ?? "unknown");
     }
 
+    private initCeleste() {
+        const syncedState = getSyncedState();
+        this.celesteSocket.updateSyncedState(syncedState);
+        if(syncedState.ControlledByDiscord) {
+            const data: AdvanceFrameData = {
+                KeysHeld: [],
+                FramesToAdvance: 0 // Just screenshot
+            };
+            this.celesteSocket.sendAdvanceFrame(data);
+            // this.eventRecorder.recordInputHistory(data, []);
+        }
+    }
+    
     private setupClientEvents() {
         this.client.once("ready", async () => {
-            console.log("Ready!");
+            console.log("Discord client ready!");
 
             if(!this.celesteConnected) {
                 // Wait for celeste to connect
@@ -275,9 +304,7 @@ Capped to ${maxFrames} frames.`,
                 }
             }
 
-            const syncedState = getSyncedState();
-            this.celesteSocket.updateSyncedState(syncedState);
-            let previousControlledByDiscord = syncedState.ControlledByDiscord;
+            let previousControlledByDiscord = getSyncedState().ControlledByDiscord;
             
             setStateChangeCallback(() => {
                 const syncedState = getSyncedState();
@@ -293,14 +320,10 @@ Capped to ${maxFrames} frames.`,
                 previousControlledByDiscord = syncedState.ControlledByDiscord;
             });
             
-            if(syncedState.ControlledByDiscord) {
-                const data: AdvanceFrameData = {
-                    KeysHeld: [],
-                    FramesToAdvance: 0 // Just screenshot
-                };
-                this.celesteSocket.sendAdvanceFrame(data);
-            }
-            // this.eventRecorder.recordInputHistory(data, []);
+            this.initCeleste();
+            this.descriptionManager.updateDescription();
+            
+            this.initializedDiscord = true;
         });
 
         this.client.on(Events.MessageReactionAdd, async (reaction, user) => {

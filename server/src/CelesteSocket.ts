@@ -30,6 +30,10 @@ export type FrameEvent = {
     height: number;
 };
 
+export type DeathEvent = {
+    newDeathCount: number;
+};
+
 export type StrawberryCollectedEvent = {
     roomName: string;
     chapterName: string;
@@ -41,7 +45,7 @@ export type StrawberryCollectedEvent = {
 };
 
 export type ChangeRoomEvent = {
-    fromRoomName: string;
+    fromRoomName: string | null;
     toRoomName: string;
     chapterName: string;
 };
@@ -60,7 +64,7 @@ type CelesteEventMap = {
     error: [Error];
     screenshotData: [FrameEvent];
     message: [string];
-    playerDeath: [];
+    playerDeath: [DeathEvent];
     strawberryCollected: [StrawberryCollectedEvent];
     changeRoom: [ChangeRoomEvent];
     completeChapter: [CompleteChapterEvent];
@@ -157,7 +161,8 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
                     break;
                 }
                 case CelesteToServerMessageType.PlayerDeath: {
-                    this.emit("playerDeath");
+                    const json = JSON.parse(payload.toString("utf8"));
+                    this.emit("playerDeath", json as DeathEvent);
                     break;
                 }
                 case CelesteToServerMessageType.StrawberryCollected: {

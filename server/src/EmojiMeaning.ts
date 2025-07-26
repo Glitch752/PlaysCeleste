@@ -119,6 +119,7 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.wait("8️⃣", 0, 8),
     EmojiMeaning.wait("9️⃣", 0, 9),
     EmojiMeaning.wait("🔟", 0, 10),
+    EmojiMeaning.wait("💯", 0, 100), // why not?
     // Clock emojis are seconds, e.g. 1 o'clock is 1 second, 1:30 is 1.5 seconds, etc
     EmojiMeaning.wait("🕐", 1, 0),
     EmojiMeaning.wait("🕜", 1.5, 0),

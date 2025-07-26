@@ -4,9 +4,24 @@ export function debounce<T extends (...args: any[]) => void>(
 ): (...args: Parameters<T>) => void {
     let timeoutId: ReturnType<typeof setTimeout>;
     
-    return function (this: any, ...args: Parameters<T>) {
+    return function(this: any, ...args: Parameters<T>) {
         clearTimeout(timeoutId);
         timeoutId = setTimeout(() => func.apply(this, args), timeout());
+    };
+}
+
+export function throttle<T extends (...args: any[]) => void>(
+    func: T,
+    timeout: () => number
+): (...args: Parameters<T>) => void {
+    let lastCall = 0;
+    
+    return function(this: any, ...args: Parameters<T>) {
+        const now = Date.now();
+        if(now - lastCall >= timeout()) {
+            lastCall = now;
+            return func.apply(this, args);
+        }
     };
 }
 

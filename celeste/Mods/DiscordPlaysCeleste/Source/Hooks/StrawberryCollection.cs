@@ -32,15 +32,13 @@ public static class StrawberryCollection {
     private static void OnCollect(On.Celeste.Strawberry.orig_OnCollect orig, Strawberry self) {
         orig(self);
         
-        string roomName = self.SceneAs<Level>().Session.LevelData.Name;
+        string roomName = self.ID.Level;
         string chapterName = ChangeRoom.GetChapterName(self.SceneAs<Level>().Session.Area);
         int newStrawberryCount = SaveData.Instance.TotalStrawberries;
         
         if(self.Moon) {
             SocketConnection.SendMessage("Wow. actually insane. what. how did you do this. I didn't even add support for this because I didn't think it would ever happen.");
         }
-        
-        $"Golden: {self.Golden}, winged: {self.Winged}".Log();
         
         SocketConnection.SendStrawberryCollected(new SocketConnection.StrawberryCollectedEvent(
             roomName,

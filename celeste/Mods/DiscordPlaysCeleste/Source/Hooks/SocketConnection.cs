@@ -63,6 +63,16 @@ public static class SocketConnection {
         }
     }
     
+    public class DeathEvent {
+        public int newDeathCount { get; set; }
+        
+        public DeathEvent(
+            int newDeathCount
+        ) {
+            this.newDeathCount = newDeathCount;
+        }
+    }
+    
     public class ChangeRoomEvent {
         public string fromRoomName { get; set; }
         public string toRoomName { get; set; }
@@ -162,16 +172,14 @@ public static class SocketConnection {
         socket.Send((byte)CelesteToServerMessageType.Frame, rgbaFrameData, extraHeader);
     }
     
-    public static void SendPlayerDeath() {
-        socket.Send((byte)CelesteToServerMessageType.PlayerDeath, []);
-    }
-    
     private static void SendEvent<T>(CelesteToServerMessageType messageType, T eventData) {
         string json = JsonSerializer.Serialize(eventData);
         byte[] data = System.Text.Encoding.UTF8.GetBytes(json);
         socket.Send((byte)messageType, data);
     }
 
+    
+    public static void SendPlayerDeath(DeathEvent ev) => SendEvent(CelesteToServerMessageType.PlayerDeath, ev);
     public static void SendStrawberryCollected(StrawberryCollectedEvent ev) => SendEvent(CelesteToServerMessageType.StrawberryCollected, ev);
     public static void SendChangeRoom(ChangeRoomEvent ev) => SendEvent(CelesteToServerMessageType.ChangeRoom, ev);
     public static void SendCompleteChapter(CompleteChapterEvent ev) => SendEvent(CelesteToServerMessageType.CompleteChapter, ev);

@@ -90,6 +90,11 @@ public class GameState {
     }
     
     public void Update(GameTime gameTime) {
+        if(!syncedState.ControlledByDiscord) {
+            UpdateManualControl(gameTime);
+            return;
+        }
+        
         while(framesToAdvanceRemaining <= 0) {
             if(!syncedState.ControlledByDiscord) {
                 UpdateManualControl(gameTime);
@@ -138,7 +143,5 @@ public class GameState {
         MInput.Keyboard.CurrentState = state;
         
         MInput.UpdateVirtualInputs();
-        
-        $"{MInput.Keyboard.Check(Keys.Right)}".Log();
     }
 }
