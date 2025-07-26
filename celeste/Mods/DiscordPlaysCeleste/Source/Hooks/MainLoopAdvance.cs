@@ -7,7 +7,6 @@ public static class MainLoopAdvance {
     [Load]
     private static void Load() {
         On.Monocle.Engine.Update += OnUpdate;
-        On.Monocle.Engine.Draw += OnDraw;   
         
         // We simulate individual frames manually, so turn off fixed timestep.
         Engine.Instance.IsFixedTimeStep = false;
@@ -16,7 +15,6 @@ public static class MainLoopAdvance {
     [Unload]
     private static void Unload() {
         On.Monocle.Engine.Update -= OnUpdate;
-        On.Monocle.Engine.Draw -= OnDraw;
         
         Engine.Instance.IsFixedTimeStep = true;
     }
@@ -26,12 +24,24 @@ public static class MainLoopAdvance {
     /// Called before draw. We simulate a single advanced frame at 60FPS no matter what actually happened.
     /// </summary>
     private static void OnUpdate(On.Monocle.Engine.orig_Update orig, Engine self, GameTime gameTime) {
-        GameState.Instance.Update(gameTime);
+        if(gameTime.TotalGameTime.TotalSeconds < 2) {
+            orig(self, gameTime);
+            return;
+        }
         
+        long startRealTime = DateTime.Now.Ticks;
+        
+        GameState.Instance.Update(gameTime);
         orig(self, GameState.Instance.simulatedGameTime);
-    }
-    
-    private static void OnDraw(On.Monocle.Engine.orig_Draw orig, Monocle.Engine self, GameTime _gameTime) {
-        orig(self, GameState.Instance.simulatedGameTime);
+        
+        while(
+            GameState.Instance.framesToAdvanceRemaining > 0 &&
+            GameState.Instance.syncedState.ControlledByDiscord &&
+            DateTime.Now.Ticks - startRealTime < TimeSpan.TicksPerSecond / 80
+        ) {
+            // Simulate as fast as possible while controlled by Discord
+            GameState.Instance.Update(gameTime);
+            orig(self, GameState.Instance.simulatedGameTime);
+        }
     }
 }

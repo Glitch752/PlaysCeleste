@@ -1,6 +1,6 @@
 import { Client, TextChannel } from "discord.js";
 import { PersistentData } from "./PersistentData";
-import { throttle } from "./utils";
+import { throttleDebounce } from "./utils";
 import { config } from "./config";
 
 type DescriptionData = {
@@ -24,7 +24,7 @@ export class DescriptionManager {
         private client: Client
     ) {
         // Description updates are rate-limited to 2 requests per 10 minutes (why is it so restrictive??)
-        this.descriptionData.onChange(throttle(this.updateDescription.bind(this), () => 1000 * (60 * 5 + 1)));
+        this.descriptionData.onChange(throttleDebounce(this.updateDescription.bind(this), () => 1000 * (60 * 5 + 1)));
     }
     
     public getDescription(): string {

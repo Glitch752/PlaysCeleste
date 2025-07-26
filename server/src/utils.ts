@@ -10,17 +10,24 @@ export function debounce<T extends (...args: any[]) => void>(
     };
 }
 
-export function throttle<T extends (...args: any[]) => void>(
+export function throttleDebounce<T extends (...args: any[]) => void>(
     func: T,
     timeout: () => number
 ): (...args: Parameters<T>) => void {
     let lastCall = 0;
-    
+    let timeoutId: ReturnType<typeof setTimeout>;
+
     return function(this: any, ...args: Parameters<T>) {
         const now = Date.now();
-        if(now - lastCall >= timeout()) {
+        if(now - lastCall < timeout()) {
+            clearTimeout(timeoutId);
+            timeoutId = setTimeout(() => {
+                lastCall = now;
+                func.apply(this, args);
+            }, timeout() - (now - lastCall));
+        } else {
             lastCall = now;
-            return func.apply(this, args);
+            func.apply(this, args);
         }
     };
 }

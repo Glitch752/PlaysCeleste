@@ -14,19 +14,7 @@ public static class ScreenshotFrame {
     }
     
     static void RenderCore(On.Monocle.Engine.orig_RenderCore orig, Engine self) {
-        if(self.scene != null) {
-            self.scene.BeforeRender();
-        }
-
-        self.GraphicsDevice.SetRenderTarget(null);
-        self.GraphicsDevice.Viewport = Engine.Viewport;
-
-        self.GraphicsDevice.Clear(Engine.ClearColor);
-
-        if(self.scene != null) {
-            self.scene.Render();
-            self.scene.AfterRender();
-        }
+        orig(self);
 
         if(GameState.Instance.shouldScreenshot) {
             SendScreenshotToServer(self.GraphicsDevice); 

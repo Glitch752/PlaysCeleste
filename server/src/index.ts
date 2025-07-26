@@ -77,13 +77,12 @@ class DiscordPlaysCelesteServer {
             const pngBuffer = Buffer.from(pngArrayBuffer);
 
             const message = await this.sendToChannel({
-                content: `${this.descriptionManager.getDescription()}
-
-Here's the latest screenshot of the game. See <#1396661382782517401> for how to play.`,
+                content: `See <#1396661382782517401> for how to play, or react with ℹ️ for more.`,
                 files: [new AttachmentBuilder(pngBuffer, {
                     name: "celeste.png"
                 })]
             });
+            
             if(message) {
                 this.latestMessageID = message.id;
             } else {
@@ -335,16 +334,15 @@ Capped to ${maxFrames} frames.`,
                     return;
                 }
             }
-            if(user.partial) {
-                try {
-                    await user.fetch();
-                } catch(error) {
-                    console.log(`Error fetching partial user: ${error}`);
-                    return;
-                }
-            }
 
             if(reaction.message.id === this.latestMessageID && user.id != this.client.user?.id) {
+                if(reaction.emoji.name === "ℹ️") {
+                    await this.sendToChannel({
+                        content: this.descriptionManager.getDescription(),
+                        flags: MessageFlags.SuppressEmbeds
+                    });
+                }
+                
                 console.log(`Received ${reaction.emoji.name} reaction to latest message`);
                 this.reactionsFinishedDebounce(reaction.message.reactions);
             }
