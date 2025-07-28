@@ -1,43 +1,53 @@
-# Discord Plays Celeste
+# Plays Celeste
 
-(From [the Discord server](https://discord.gg/vNq6rRWM))
+This project was originally named "Discord Plays Celeste" as a Discord bot to allow distributed gameplay of [Celeste](https://www.celestegame.com/) by presenting the game one screenshot at a time with interactive controls. However, I've also expanded to a Twitch bot controlled by the same Celeste mod.
 
 ## What is this?
-Welcome to Discord Plays Celeste! This is a little project to allow distributed gameplay of [Celeste](https://www.celestegame.com/) through a Discord bot that presents the game with interactive controls, one screenshot at a time.
+This is a little project to allow distributed gameplay of [Celeste](https://www.celestegame.com/) on various social platforms not... really meant for it. The game is presented one screenshot at a time, while users vote to decide on the next keys to hold and how many frames to advance the game. This is, in a way, similar to Celeste TAS runs, except in real time; in fact, I have tooling in place to convert the final run to a TAS!
 
-This is made of two components:
-- The Discord bot backend itself in Typescript that interfaces with the game.
-- A mod for [Everest](https://everestapi.github.io/) to interface closely with the game (manage when frames are advanced, overwrite what keys are pressed, readback the output, etc). It's only tested on Everest version 5635, and some of the code is admittedly hacky enough that I wouldn't be surprised if it breaks on other versions.
+<img src="images/discord.png" height="500" />
+<img src="images/discord2.png" height="500">
 
-The bot is meant to run headless on a Linux server with software Vulkan rendering, but it isn't tied to a specific renderer.
+The bot is made of primary two components:
+- The Discord bot backend in Typescript that sends screenshots, takes user input, and logs events.
+- A mod for [Everest](https://everestapi.github.io/) to interface closely with the game (manage when frames are advanced, overwrite what keys are pressed, readback the output, etc). It targets Everest version 5635.
 
-## How to play
+The project is meant to run headless on a Linux server with software Vulkan rendering. It isn't tied to a specific renderer, but it currently only works on Linux because it uses Unix sockets to communicate.
+
+## Features:
+- TAS-like frame-perfect input handling
+- Native screenshot/buffer readback so the game can run headless
+- Robust (ish?) socket communication
+- Manual override for game control (e.g. settings bindings)
+- Collected strawberry tracking
+- Death tracking
+- Room and chapter completion tracking
+- Faster-than-realtime game updates
+- Event logging for user statistics and eventual TAS conversion
+- Live configuration reloading from disk
+- A bunch of silly easter eggs for cases like game crashes, trying to exit the game, etc.
+
+## How to play over Discord
 The gameplay loop is as follows:
 - The bot sends a message with a screenshot of the game
 - Users react with emojis that have different purposes (see below)
 - Once there is a valid reaction state, a certain number of users have reacted to at least one action, and it's been a few seconds since the latest reaction, the game will advance and repeat.
 
 Valid reactions:
-- Regional indicators (e.g. :regional_indicator_c:) cause their corresponding key to be held down
-  - :regional_indicator_c: jumps
-  - :regional_indicator_x: dashes
-  - :regional_indicator_z: grabs
-arrows: move
-- :leftwards_arrow_with_hook: holds enter
-- :arrow_right_hook: holds tab
-- :arrow_up:, :arrow_down:, :arrow_left:, and :arrow_right: hold the corresponding arrow keys
-- :x: holds escape
-- Numbers (e.g. :one:) progress the game the corresponding number of frames
-- :fast_forward: multiplies the frame count by 6 (effectively turning it from frames to tenths of a second)
-- Clocks (e.g. :clock1:) progress the game the corresponding number of seconds
-  - Half-hour increments correspond to half-seconds, e.g. :clock330: is 3.5 seconds.
+- Regional indicators (e.g. <img alt="regional_indicator_c" title="regional_indicator_c" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f1fd.png" style="height: 2ch; vertical-align: middle">) cause their corresponding key to be held down
+- Arrows (e.g. <img alt="arrow_right" title="arrow_right" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/27a1.png" style="height: 2ch; vertical-align: middle">) hold down the corresponding arrow (diagonal arrows also work)
+- <img alt="leftwards_arrow_with_hook" title="leftwards_arrow_with_hook" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/21a9.png" style="height: 2ch; vertical-align: middle"> holds enter
+- <img alt="arrow_right_hook" title="arrow_right_hook" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/21aa.png" style="height: 2ch; vertical-align: middle"> holds tab
+- <img alt="x" title="x" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/274c.png" style="height: 2ch; vertical-align: middle"> holds escape
+- Numbers (e.g. <img alt="one" title="one" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/31-20e3.png" style="height: 2ch; vertical-align: middle">) progress the game the corresponding number of frames
+- <img alt="fast_forward" title="fast_forward" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/23e9.png" style="height: 2ch; vertical-align: middle"> multiplies the frame count by 6 (effectively turning it from frames to tenths of a second)
+- Clocks (e.g. <img alt="clock1" title="clock1" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f550.png" style="height: 2ch; vertical-align: middle">) progress the game the corresponding number of seconds
+  - Half-hour increments correspond to half-seconds, e.g. <img alt="clock330" title="clock330" src="https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/72x72/1f55e.png" style="height: 2ch; vertical-align: middle"> is 3.5 seconds.
 
 Keys are only held until the next loop, so they must be repeated every time they're still needed. Progress intervals stack.
 
-## Please work toward a shared goal!
-Feel free to communicate live; it makes it much more fun! The initial goal, of course, is to beat the game, but I'm not sure how feasible that is :upside_down:
-If someone is intentionally trying to stall progress, I don't currently have a mechanism in place for revoking permissions, but I plan to mute users if needed. Feel free to mess around if it's not harmful, though, of course!
-
+## How to play over Twitch
+TODO; this is a work-in-progress
 
 ## TODO
-- Track hearts
+- Track crystal hearts
