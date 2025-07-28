@@ -5,8 +5,10 @@ This project was originally named "Discord Plays Celeste" as a Discord bot to al
 ## What is this?
 This is a little project to allow distributed gameplay of [Celeste](https://www.celestegame.com/) on various social platforms not... really meant for it. The game is presented one screenshot at a time, while users vote to decide on the next keys to hold and how many frames to advance the game. This is, in a way, similar to Celeste TAS runs, except in real time; in fact, I have tooling in place to convert the final run to a TAS!
 
-<img src="images/discord.png" height="500" />
-<img src="images/discord2.png" height="500">
+<p align="middle">
+  <img src="images/discord.png" width="45%" />
+  <img src="images/discord2.png" width="45%" />
+</p>
 
 The bot is made of primary two components:
 - The Discord bot backend in Typescript that sends screenshots, takes user input, and logs events.
