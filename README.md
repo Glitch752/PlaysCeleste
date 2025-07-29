@@ -53,3 +53,4 @@ TODO; this is a work-in-progress
 
 ## TODO
 - Track crystal hearts
+- Finish Twitch integration

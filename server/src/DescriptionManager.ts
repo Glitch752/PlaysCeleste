@@ -1,7 +1,5 @@
-import { Client, TextChannel } from "discord.js";
 import { PersistentData } from "./PersistentData";
 import { throttleDebounce } from "./utils";
-import { config } from "./config";
 
 type DescriptionData = {
     currentChapter: string | null,
@@ -21,27 +19,20 @@ export class DescriptionManager {
     }, "descriptionData.json");
     
     constructor(
-        private client: Client
+        updateDescription: (description: string) => void
     ) {
         // Description updates are rate-limited to 2 requests per 10 minutes (why is it so restrictive??)
-        this.descriptionData.onChange(throttleDebounce(this.updateDescription.bind(this), () => 1000 * (60 * 5 + 1)));
+        this.descriptionData.onChange(throttleDebounce(() => {
+            updateDescription(this.getDescription());
+        }, () => 1000 * (60 * 5 + 1)));
     }
     
     public getDescription(): string {
         const data = this.descriptionData.data;
         if(data.currentChapter !== null) {
-            return `_${data.currentChapter} ${data.currentRoom}_   :strawberry: ${data.strawberryCount}/175   ${data.deathCount} deaths (${data.turnsSinceDeath} turn${data.turnsSinceDeath != 1 ? "s" : ""} since last)`;
+            return `_${data.currentChapter} ${data.currentRoom}_   🍓 ${data.strawberryCount}/175   ${data.deathCount} deaths (${data.turnsSinceDeath} turn${data.turnsSinceDeath != 1 ? "s" : ""} since last)`;
         } else {
-            return `No room controlled   :strawberry: ${data.strawberryCount}/175   ${data.deathCount} deaths (${data.turnsSinceDeath} turn${data.turnsSinceDeath != 1 ? "s" : ""} since last)`;
-        }
-    }
-    
-    public async updateDescription() {
-        const channel = this.client.channels.cache.get(config.CHANNEL_ID);
-        if(channel && channel.isTextBased()) {
-            (channel as TextChannel).setTopic(`See <#1396661382782517401>!   ${this.getDescription()}
-                    
-Info may be out-of-date due to severe rate-limiting on Discord's side.`);
+            return `No room controlled   🍓 ${data.strawberryCount}/175   ${data.deathCount} deaths (${data.turnsSinceDeath} turn${data.turnsSinceDeath != 1 ? "s" : ""} since last)`;
         }
     }
     

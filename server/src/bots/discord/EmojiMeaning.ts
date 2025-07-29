@@ -1,6 +1,6 @@
-import { AdvanceFrameData } from "./CelesteSocket";
-import { getSyncedState } from "./state";
-import { formatList } from "./utils";
+import { AdvanceFrameData } from "../../CelesteSocket";
+import { getSyncedState } from "../../state";
+import { formatList } from "../../utils";
 
 export class ApplyContext {
     public keysHeld: Set<string> = new Set();
