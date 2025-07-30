@@ -6,6 +6,8 @@ import { EventRecorder } from "./EventRecorder";
 import { DescriptionManager } from "./DescriptionManager";
 import { Bot } from "./bots/Bot";
 import { DiscordBot } from "./bots/discord/DiscordBot";
+import { config } from "./config";
+import { TwitchBot } from "./bots/twitch/TwitchBot";
 
 class DiscordPlaysCelesteServer {
     private celesteSocket: CelesteSocket;
@@ -152,4 +154,4 @@ class DiscordPlaysCelesteServer {
     }
 }
 
-new DiscordPlaysCelesteServer(new DiscordBot());
+new DiscordPlaysCelesteServer(config.BOT_TO_USE === "discord" ? new DiscordBot() : new TwitchBot());
