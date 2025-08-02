@@ -147,6 +147,6 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.wait("🕧", 0.5, 0),
 ];
 
-export function findEmojiMeaning(name: string | null) {
-    return emojiMeanings.find(m => m.emoji === name);
+export function findEmojiMeaning(name: string | null): EmojiMeaning | null {
+    return emojiMeanings.find(m => m.emoji === name) ?? null;
 }

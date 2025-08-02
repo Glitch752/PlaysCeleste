@@ -7,6 +7,9 @@ import { ChangeRoomResult } from "../../EventRecorder";
 export class TwitchBot extends Bot {
     private client: Client;
     
+    // Twitch's game ID for Celeste.
+    private static CELESTE_GAME_ID: string = "492535";
+    
     constructor() {
         super();
         

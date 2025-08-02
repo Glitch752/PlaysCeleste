@@ -22,7 +22,10 @@ export class DiscordBot extends Bot {
                 GatewayIntentBits.Guilds,
                 GatewayIntentBits.GuildMessages,
                 GatewayIntentBits.GuildMessageReactions
-            ]
+            ],
+            rest: {
+                timeout: 60_000,
+            }
         });
         
         this.reactionsFinishedDebounce = debounce(this.updateReactions.bind(this), () => getReactionDebounce() * 1000);
@@ -53,7 +56,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
     
     private async updateReactions(reactions: ReactionManager) {
         // Find all reactions with more than MINIMUM_REACTIONS_REQUIRED reactions
-        const validReactions = [...reactions.cache.values()].filter(r => r.count >= getMinimumReactionsRequired());
+        let validReactions = [...reactions.cache.values()].filter(r => r.count >= getMinimumReactionsRequired());
         if(validReactions.length === 0) {
             // This isn't valid yet
             return;
@@ -61,9 +64,10 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
 
         // Apply all the reactions to a new context and continue only if the resulting context is valid
         const context = new ApplyContext();
-        validReactions.forEach(reaction => {
+        validReactions = validReactions.filter(reaction => {
             const meaning = findEmojiMeaning(reaction.emoji.name);
             if(meaning) meaning.apply(context);
+            return meaning !== null;
         });
 
         if(!context.isValid()) {
