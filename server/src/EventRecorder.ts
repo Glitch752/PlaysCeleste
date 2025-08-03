@@ -208,9 +208,16 @@ export class EventRecorder {
      * Returns a list of contributor IDs.
      */
     async collectStrawberry(celesteEvent: StrawberryCollectedEvent): Promise<string[]> {
-        const contributors = celesteEvent.isGolden ?
+        let contributors = celesteEvent.isGolden ?
             (await this.getChapterContributors(celesteEvent.chapterName))
-            : this.previousRoomContributors.get(celesteEvent.roomName) ?? this.currentContributors;
+            : (this.previousRoomContributors.get(celesteEvent.roomName) ?? []).concat(this.currentContributors);
+        
+        // Deduplicate contributors
+        const uniqueContributors = new Map<string, EventUser>();
+        for(const user of contributors) {
+            uniqueContributors.set(user.id, user);
+        }
+        contributors = Array.from(uniqueContributors.values());
         
         this.record({
             type: EventType.CollectStrawberry,
