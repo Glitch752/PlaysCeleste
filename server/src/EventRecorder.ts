@@ -58,10 +58,6 @@ type GameEventData = {
 
 export type ChangeRoomResult = {
     /**
-     * If the room we came from was cleared. Only true if we've entered a new room.
-     */
-    wasCleared: boolean,
-    /**
      * If this was the first clear of the room.
      */
     firstClear: boolean,
@@ -127,14 +123,10 @@ export class EventRecorder {
      * Returns if this was the first time we've entered the new room and a list of contributor IDs.
      */
     async changeRoom(fromRoomName: string | null, toRoomName: string, chapterName: string): Promise<ChangeRoomResult> {
-        let firstEnter = true;
         let firstClear = true;
         for await(const event of this.streamEvents()) {
             if(event.type === EventType.ChangeRoom) {
-                if(event.toRoomName === toRoomName || event.fromRoomName === toRoomName && event.chapterName === chapterName) {
-                    firstEnter = false;
-                }
-                if(event.fromRoomName === fromRoomName && event.chapterName === chapterName && event.wasCleared) {
+                if(event.toRoomName === toRoomName && event.chapterName === chapterName) {
                     firstClear = false;
                 }
             }
@@ -146,7 +138,7 @@ export class EventRecorder {
             toRoomName,
             chapterName,
             contributors: this.currentContributors,
-            wasCleared: firstEnter
+            wasCleared: firstClear
         });
         const contributorIDs = this.currentContributors.map(user => user.id);
         
@@ -156,8 +148,7 @@ export class EventRecorder {
         this.currentContributors = [];
         
         return {
-            wasCleared: firstClear,
-            firstClear: firstEnter,
+            firstClear: firstClear,
             contributors: contributorIDs
         };
     }

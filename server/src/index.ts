@@ -23,7 +23,7 @@ class DiscordPlaysCelesteServer {
         private bot: Bot
     ) {
         this.eventRecorder = new EventRecorder();
-        this.descriptionManager = new DescriptionManager(this.bot.updateDescription);
+        this.descriptionManager = new DescriptionManager(this.bot.updateDescription.bind(this.bot));
         this.celesteSocket = new CelesteSocket();
 
         this.setupCelesteSocketEvents();

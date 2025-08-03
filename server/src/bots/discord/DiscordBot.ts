@@ -217,8 +217,8 @@ Capped to ${maxFrames} frames.`,
     }
     
     public onRoomChange(event: ChangeRoomEvent, result: ChangeRoomResult): void {
-        const { contributors, firstClear, wasCleared } = result;
-        if(event.fromRoomName != null && wasCleared && firstClear) {
+        const { contributors, firstClear } = result;
+        if(event.fromRoomName != null && firstClear) {
             let content = "";
             content += `### :trophy: **${event.chapterName} ${event.toRoomName}** reached for the first time!\n`;
             content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
