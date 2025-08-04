@@ -9,8 +9,9 @@ import { ChangeRoomEvent, CompleteChapterEvent, StrawberryCollectedEvent } from 
 
 export class DiscordBot extends Bot {
     private client: Client;
-    private latestMessageID: string | null = null;
+    private gameplayMessageID: string | null = null;
     private description: string = "";
+    private lastInfoTime: number | null = null;
     
     private reactionsFinishedDebounce: (reactions: ReactionManager) => void;
     
@@ -90,7 +91,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         });
         contributors = Array.from(uniqueContributors.values());
 
-        this.latestMessageID = null;
+        this.gameplayMessageID = null;
 
         // Awesome! Advance frames.
         const message = await this.sendToChannel({
@@ -101,8 +102,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         const maxFrames = getMaxFrames();
         if(advanceData.FramesToAdvance > maxFrames) {
             this.sendToChannel({
-                content: `${advanceData.FramesToAdvance} frames... [Nice one.](https://discord.com/channels/1396648547708829778/1396661370757447680/1396944113743560894)
-Capped to ${maxFrames} frames.`,
+                content: `[${advanceData.FramesToAdvance} frames??](https://discord.com/channels/1396648547708829778/1396661370757447680/1396944113743560894) Capped to ${maxFrames}.`,
                 flags: MessageFlags.SuppressEmbeds
             });
             advanceData.FramesToAdvance = maxFrames;
@@ -128,12 +128,16 @@ Capped to ${maxFrames} frames.`,
                 }
             }
 
-            if(reaction.message.id === this.latestMessageID && user.id != this.client.user?.id) {
+            if(reaction.message.id === this.gameplayMessageID && user.id != this.client.user?.id) {
                 if(reaction.emoji.name === "ℹ️") {
-                    await this.sendToChannel({
-                        content: this.description,
-                        flags: MessageFlags.SuppressEmbeds
-                    });
+                    if(this.lastInfoTime != null && (Date.now() - this.lastInfoTime) > 5000) {
+                        this.lastInfoTime = Date.now();
+                        await this.sendToChannel({
+                            content: this.description,
+                            flags: MessageFlags.SuppressEmbeds
+                        });
+                    }
+                    return;
                 }
                 
                 console.log(`Received ${reaction.emoji.name} reaction to latest message`);
@@ -150,7 +154,7 @@ Capped to ${maxFrames} frames.`,
                 flags: MessageFlags.SuppressEmbeds
             });
             
-            this.latestMessageID = null;
+            this.gameplayMessageID = null;
             setTimeout(() => process.exit(1), 1000);
         });
 
@@ -161,7 +165,7 @@ Capped to ${maxFrames} frames.`,
                 flags: MessageFlags.SuppressEmbeds
             });
             
-            this.latestMessageID = null;
+            this.gameplayMessageID = null;
             setTimeout(() => process.exit(1), 1000);
         });
     }
@@ -174,8 +178,10 @@ Capped to ${maxFrames} frames.`,
             })]
         });
         
+        this.lastInfoTime = null;
+        
         if(message) {
-            this.latestMessageID = message.id;
+            this.gameplayMessageID = message.id;
         } else {
             console.error("Failed to send message!");
         }
