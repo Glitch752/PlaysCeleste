@@ -130,7 +130,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
 
             if(reaction.message.id === this.gameplayMessageID && user.id != this.client.user?.id) {
                 if(reaction.emoji.name === "ℹ️") {
-                    if(this.lastInfoTime != null && (Date.now() - this.lastInfoTime) > 5000) {
+                    if(this.lastInfoTime === null || (Date.now() - this.lastInfoTime) > 5000) {
                         this.lastInfoTime = Date.now();
                         await this.sendToChannel({
                             content: this.description,
