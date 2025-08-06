@@ -75,6 +75,9 @@ export class EventRecorder {
     currentContributors: EventUser[] = [];
     previousRoomContributors: Map<string, EventUser[]> = new Map();
     
+    previousRooms: string[] = [];
+    static MAX_PREVIOUS_ROOMS: number = 5;
+    
     filePath: string;
     fileHandle: number;
     
@@ -131,21 +134,40 @@ export class EventRecorder {
                 }
             }
         }
+
+        let contributors = this.currentContributors;
+        // If nobody contributed to a room, get the latest room that somebody did contribute to (if any)
+        // this probably isn't correct all of the time, but it's close enough
+        if(contributors.length === 0 && fromRoomName != null) {
+            for(let i = this.previousRooms.length - 1; i >= 0; i--) {
+                const room = this.previousRooms[i];
+                const roomContributors = this.previousRoomContributors.get(room);
+                if(roomContributors != null && roomContributors.length > 0) {
+                    contributors = roomContributors;
+                    break;
+                }
+            }
+        }
         
+        const contributorIDs = contributors.map(user => user.id);
         this.record({
             type: EventType.ChangeRoom,
             fromRoomName,
             toRoomName,
             chapterName,
-            contributors: this.currentContributors,
+            contributors: contributors,
             wasCleared: firstClear
         });
-        const contributorIDs = this.currentContributors.map(user => user.id);
         
         if(fromRoomName != null) {
             this.previousRoomContributors.set(fromRoomName, this.currentContributors);
         }
         this.currentContributors = [];
+
+        if(fromRoomName != null) {
+            this.previousRooms.push(fromRoomName);
+            if(this.previousRooms.length > EventRecorder.MAX_PREVIOUS_ROOMS) this.previousRooms.shift();
+        }
         
         return {
             firstClear: firstClear,
