@@ -95,9 +95,11 @@ public static class SocketConnection {
     
     public class SetControlledChapterEvent {
         public string? chapter { get; set; }
+        public string? reason { get; set; }
         
-        public SetControlledChapterEvent(string? chapter) {
+        public SetControlledChapterEvent(string? chapter, string? reason) {
             this.chapter = chapter;
+            this.reason = reason;
         }
     }
     #nullable disable

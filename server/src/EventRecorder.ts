@@ -53,7 +53,8 @@ type GameEventData = {
     content: string
 } | {
     type: EventType.SetControlledChapter,
-    chapter: string | null
+    chapter: string | null,
+    reason: string | null
 };
 
 export type ChangeRoomResult = {
@@ -114,10 +115,11 @@ export class EventRecorder {
      * Sets the chapter that is currently being controlled.  
      * This is used to determine which chapter events are for.
      */
-    setControlledChapter(chapter: string | null) {
+    setControlledChapter(chapter: string | null, reason: string | null) {
         this.record({
             type: EventType.SetControlledChapter,
-            chapter
+            chapter,
+            reason
         });
     }
     

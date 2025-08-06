@@ -56,6 +56,7 @@ export type CompleteChapterEvent = {
 
 export type SetControlledChapterEvent = {
     chapter: string | null;
+    reason: string | null;
 };
 
 type CelesteEventMap = {

@@ -88,7 +88,7 @@ class DiscordPlaysCelesteServer {
         this.celesteSocket.on("setControlledChapter", (event) => {
             if(event.chapter != null) console.log(`Set controlled chapter to ${event.chapter}`);
             else console.log("Cleared controlled chapter");
-            this.eventRecorder.setControlledChapter(event.chapter);
+            this.eventRecorder.setControlledChapter(event.chapter, event.reason);
             this.descriptionManager.setChapter(event.chapter);
         });
 
