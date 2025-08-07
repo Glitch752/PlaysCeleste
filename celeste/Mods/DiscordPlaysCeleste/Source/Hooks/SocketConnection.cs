@@ -117,15 +117,42 @@ public static class SocketConnection {
         [JsonConverter(typeof(JsonStringEnumConverter))]
         public HeartColor color { get; set; }
 
+        public bool isGhost { get; set; }
         public string roomName { get; set; }
         public string chapterName { get; set; }
         public int newHeartCount { get; set; }
 
-        public HeartCollectedEvent(HeartColor color, string roomName, string chapterName, int newHeartCount) {
+        public HeartCollectedEvent(
+            HeartColor color,
+            bool isGhost,
+            string roomName,
+            string chapterName,
+            int newHeartCount
+        ) {
             this.color = color;
+            this.isGhost = isGhost;
             this.roomName = roomName;
             this.chapterName = chapterName;
             this.newHeartCount = newHeartCount;
+        }
+    }
+
+    public class CassetteCollectedEvent {
+        public bool isGhost { get; set; }
+        public string roomName { get; set; }
+        public string chapterName { get; set; }
+        public int newCassetteCount { get; set; }
+        
+        public CassetteCollectedEvent(
+            bool isGhost,
+            string roomName,
+            string chapterName,
+            int newCassetteCount
+        ) {
+            this.isGhost = isGhost;
+            this.roomName = roomName;
+            this.chapterName = chapterName;
+            this.newCassetteCount = newCassetteCount;
         }
     }
     #nullable disable
@@ -138,7 +165,8 @@ public static class SocketConnection {
         ChangeRoom = 0x05,
         CompleteChapter = 0x06,
         SetControlledChapter = 0x07,
-        HeartCollected = 0x08
+        HeartCollected = 0x08,
+        CassetteCollected = 0x09
     }
     
     public static void OnMessageReceived(ConcurrentSocket.SocketMessage message) {
@@ -214,6 +242,7 @@ public static class SocketConnection {
     public static void SendCompleteChapter(CompleteChapterEvent ev) => SendEvent(CelesteToServerMessageType.CompleteChapter, ev);
     public static void SendSetControlledChapter(SetControlledChapterEvent ev) => SendEvent(CelesteToServerMessageType.SetControlledChapter, ev);
     public static void SendHeartCollected(HeartCollectedEvent ev) => SendEvent(CelesteToServerMessageType.HeartCollected, ev);
+    public static void SendCassetteCollected(CassetteCollectedEvent ev) => SendEvent(CelesteToServerMessageType.CassetteCollected, ev);
 
     public static FrameAdvanceData BlockUntilFrameAdvance() {
         FrameAdvanceData data;

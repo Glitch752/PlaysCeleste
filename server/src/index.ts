@@ -74,9 +74,14 @@ class DiscordPlaysCelesteServer {
             this.descriptionManager.setStrawberryCount(event.newStrawberryCount);
         });
 
-        this.celesteSocket.on("heartCollected", async (event) => {
-            const [firstCollection, contributors] = await this.eventRecorder.collectHeart(event);
-            this.bot.onHeartCollected(event, firstCollection, contributors);
+        this.celesteSocket.on("heartCollected", (event) => {
+            const contributors = this.eventRecorder.collectHeart(event);
+            this.bot.onHeartCollected(event, contributors);
+        });
+
+        this.celesteSocket.on("cassetteCollected", (event) => {
+            const contributors = this.eventRecorder.collectCassette(event);
+            this.bot.onCassetteConnected(event, contributors);
         });
         
         this.celesteSocket.on("changeRoom", async (event) => {

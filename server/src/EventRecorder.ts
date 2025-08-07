@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { AdvanceFrameData, ChangeRoomEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "./CelesteSocket";
+import { AdvanceFrameData, CassetteCollectedEvent, ChangeRoomEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "./CelesteSocket";
 
 enum EventType {
     InputHistory = "inputHistory",
@@ -8,6 +8,7 @@ enum EventType {
     CompleteChapter = "completeChapter",
     CollectStrawberry = "collectStrawberry",
     CollectHeart = "collectHeart",
+    CollectCassette = "collectCassette",
     Death = "death",
     Message = "message",
     SetControlledChapter = "setControlledChapter"
@@ -50,6 +51,14 @@ type GameEventData = {
     type: EventType.CollectHeart,
     contributors: EventUser[],
     newHeartCount: number,
+    isGhost: boolean,
+    roomName: string,
+    chapterName: string
+} | {
+    type: EventType.CollectCassette,
+    contributors: EventUser[],
+    newCassetteCount: number,
+    isGhost: boolean,
     roomName: string,
     chapterName: string
 } | {
@@ -275,25 +284,10 @@ export class EventRecorder {
     
     /**
      * Run when a crystal heart is collected.  
-     * Returns if this was the first collection and a list of contributor IDs.
+     * Returns a list of contributor IDs.
      */
-    async collectHeart(celesteEvent: HeartCollectedEvent): Promise<[boolean, string[]]> {
-        let firstCollection = true;
-        
-        let contributors = await this.getChapterContributors(celesteEvent.chapterName, (event) => {
-            if(
-                event.type === EventType.CollectHeart &&
-                event.roomName === celesteEvent.roomName &&
-                event.chapterName === celesteEvent.chapterName
-            ) {
-                firstCollection = false;
-            }
-        });
-        
-
-        if(celesteEvent.color === HeartColor.Fake) {
-            contributors = (this.previousRoomContributors.get(celesteEvent.roomName) ?? []).concat(this.currentContributors);
-        }
+    collectHeart(celesteEvent: HeartCollectedEvent): string[] {
+        let contributors = (this.previousRoomContributors.get(celesteEvent.roomName) ?? []).concat(this.currentContributors);
         
         // Deduplicate contributors
         const uniqueContributors = new Map<string, EventUser>();
@@ -304,13 +298,40 @@ export class EventRecorder {
         
         this.record({
             type: EventType.CollectHeart,
+            isGhost: celesteEvent.isGhost,
             newHeartCount: celesteEvent.newHeartCount,
             roomName: celesteEvent.roomName,
             chapterName: celesteEvent.chapterName,
             contributors
         });
         
-        return [firstCollection, contributors.map(user => user.id)];
+        return contributors.map(user => user.id);
+    }
+
+    /**
+     * Run when a cassette is collected.  
+     * Returns a list of contributor IDs.
+     */
+    collectCassette(celesteEvent: CassetteCollectedEvent): string[] {
+        let contributors = (this.previousRoomContributors.get(celesteEvent.roomName) ?? []).concat(this.currentContributors);
+        
+        // Deduplicate contributors
+        const uniqueContributors = new Map<string, EventUser>();
+        for(const user of contributors) {
+            uniqueContributors.set(user.id, user);
+        }
+        contributors = Array.from(uniqueContributors.values());
+        
+        this.record({
+            type: EventType.CollectCassette,
+            isGhost: celesteEvent.isGhost,
+            newCassetteCount: celesteEvent.newCassetteCount,
+            roomName: celesteEvent.roomName,
+            chapterName: celesteEvent.chapterName,
+            contributors
+        });
+        
+        return contributors.map(user => user.id);
     }
     
     /**

@@ -5,7 +5,7 @@ import { getMaxFrames, getMinimumReactionsRequired, getReactionDebounce, shouldL
 import { ApplyContext, findEmojiMeaning } from "./EmojiMeaning";
 import { ChangeRoomResult, EventUser } from "../../EventRecorder";
 import { debounce } from "../../utils";
-import { ChangeRoomEvent, CompleteChapterEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "../../CelesteSocket";
+import { CassetteCollectedEvent, ChangeRoomEvent, CompleteChapterEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "../../CelesteSocket";
 
 export class DiscordBot extends Bot {
     private client: Client;
@@ -220,11 +220,31 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
             content,
             flags: MessageFlags.SuppressEmbeds
         });
+
+        if(event.newStrawberryCount >= 202) {
+            this.sendToChannel({
+                content: "<:hyperfrogeline:1401669754263048313> what"
+            });
+        }
     }
 
-    public onHeartCollected(event: HeartCollectedEvent, firstCollection: boolean, contributors: string[]): void {
+    public onCassetteConnected(event: CassetteCollectedEvent, contributors: string[]): void {
+        const firstTimeText = event.isGhost ? "" : " for the first time";
+
+        let content = `### :vhs: Collected **${event.chapterName}** cassette${firstTimeText}! ${event.newCassetteCount} cassette${event.newCassetteCount === 1 ? "" : "s"} total.\n`;
+        
+        content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
+        content += "-# Note: contributors may not be accurate; it's just a heuristic!";
+        
+        this.sendToChannel({
+            content,
+            flags: MessageFlags.SuppressEmbeds
+        });
+    }
+
+    public onHeartCollected(event: HeartCollectedEvent, contributors: string[]): void {
         let content = "";
-        const firstTimeText = firstCollection ? " for the first time" : "";
+        const firstTimeText = event.isGhost ? "" : " for the first time";
 
         let emoji = ({
             [HeartColor.Blue]: ":blue_heart:",

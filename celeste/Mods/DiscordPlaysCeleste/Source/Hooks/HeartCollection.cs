@@ -40,6 +40,7 @@ public static class HeartCollection {
 
         SocketConnection.SendHeartCollected(new SocketConnection.HeartCollectedEvent(
             color,
+            self.IsGhost,
             roomName,
             chapterName,
             newHeartCount
