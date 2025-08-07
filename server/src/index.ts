@@ -73,6 +73,11 @@ class DiscordPlaysCelesteServer {
             this.bot.onStrawberryCollected(event, contributors);
             this.descriptionManager.setStrawberryCount(event.newStrawberryCount);
         });
+
+        this.celesteSocket.on("heartCollected", async (event) => {
+            const [firstCollection, contributors] = await this.eventRecorder.collectHeart(event);
+            this.bot.onHeartCollected(event, firstCollection, contributors);
+        });
         
         this.celesteSocket.on("changeRoom", async (event) => {
             const result = await this.eventRecorder.changeRoom(event);

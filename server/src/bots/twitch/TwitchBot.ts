@@ -1,7 +1,7 @@
 import { Bot } from "../Bot";
 import { Client } from "tmi.js";
 import { config } from "../../config";
-import { ChangeRoomEvent, CompleteChapterEvent, StrawberryCollectedEvent } from "../../CelesteSocket";
+import { ChangeRoomEvent, CompleteChapterEvent, HeartCollectedEvent, StrawberryCollectedEvent } from "../../CelesteSocket";
 import { ChangeRoomResult } from "../../EventRecorder";
 
 export class TwitchBot extends Bot {
@@ -68,6 +68,10 @@ export class TwitchBot extends Bot {
     }
     
     public onStrawberryCollected(event: StrawberryCollectedEvent, contributors: string[]): void {
+        // TODO
+    }
+
+    public onHeartCollected(event: HeartCollectedEvent, firstCollection: boolean, contributors: string[]): void {
         // TODO
     }
 }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Threading;
 using Celeste.Mod;
 using Celeste.Mod.mod;
@@ -104,6 +105,29 @@ public static class SocketConnection {
             this.reason = reason;
         }
     }
+
+    public enum HeartColor {
+        Fake,
+        Blue,
+        Red,
+        Gold
+    }
+
+    public class HeartCollectedEvent {
+        [JsonConverter(typeof(JsonStringEnumConverter))]
+        public HeartColor color { get; set; }
+
+        public string roomName { get; set; }
+        public string chapterName { get; set; }
+        public int newHeartCount { get; set; }
+
+        public HeartCollectedEvent(HeartColor color, string roomName, string chapterName, int newHeartCount) {
+            this.color = color;
+            this.roomName = roomName;
+            this.chapterName = chapterName;
+            this.newHeartCount = newHeartCount;
+        }
+    }
     #nullable disable
 
     private enum CelesteToServerMessageType {
@@ -113,7 +137,8 @@ public static class SocketConnection {
         StrawberryCollected = 0x04,
         ChangeRoom = 0x05,
         CompleteChapter = 0x06,
-        SetControlledChapter = 0x07
+        SetControlledChapter = 0x07,
+        HeartCollected = 0x08
     }
     
     public static void OnMessageReceived(ConcurrentSocket.SocketMessage message) {
@@ -188,7 +213,8 @@ public static class SocketConnection {
     public static void SendChangeRoom(ChangeRoomEvent ev) => SendEvent(CelesteToServerMessageType.ChangeRoom, ev);
     public static void SendCompleteChapter(CompleteChapterEvent ev) => SendEvent(CelesteToServerMessageType.CompleteChapter, ev);
     public static void SendSetControlledChapter(SetControlledChapterEvent ev) => SendEvent(CelesteToServerMessageType.SetControlledChapter, ev);
-    
+    public static void SendHeartCollected(HeartCollectedEvent ev) => SendEvent(CelesteToServerMessageType.HeartCollected, ev);
+
     public static FrameAdvanceData BlockUntilFrameAdvance() {
         FrameAdvanceData data;
         while(!frameAdvanceEvents.TryDequeue(out data)) {

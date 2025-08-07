@@ -1,12 +1,13 @@
 import path from "path";
 import fs from "fs";
-import { AdvanceFrameData, ChangeRoomEvent, StrawberryCollectedEvent } from "./CelesteSocket";
+import { AdvanceFrameData, ChangeRoomEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "./CelesteSocket";
 
 enum EventType {
     InputHistory = "inputHistory",
     ChangeRoom = "changeRoom",
     CompleteChapter = "completeChapter",
     CollectStrawberry = "collectStrawberry",
+    CollectHeart = "collectHeart",
     Death = "death",
     Message = "message",
     SetControlledChapter = "setControlledChapter"
@@ -45,6 +46,12 @@ type GameEventData = {
     roomName: string,
     chapterName: string,
     idKey: string
+} | {
+    type: EventType.CollectHeart,
+    contributors: EventUser[],
+    newHeartCount: number,
+    roomName: string,
+    chapterName: string
 } | {
     type: EventType.Death,
     contributors: EventUser[],
@@ -184,6 +191,8 @@ export class EventRecorder {
     private async getChapterContributors(chapterName: string, eventCallback?: (event: GameEvent) => void): Promise<EventUser[]> {
         // Collect the contributors for every room in this chapter
         const chapterContributors: Map<string, EventUser> = new Map();
+
+        const startTime = Date.now();
         
         // This isn't the most efficient way to do this, but meh.
         for await(const event of this.streamEvents()) {
@@ -203,6 +212,8 @@ export class EventRecorder {
             chapterContributors.set(user.id, user);
         }
         
+        console.log(`Collected contributors for chapter ${chapterName} in ${Date.now() - startTime}ms`);
+
         return Array.from(chapterContributors.values());
     }
     
@@ -260,6 +271,46 @@ export class EventRecorder {
         });
         
         return contributors.map(user => user.id);
+    }
+    
+    /**
+     * Run when a crystal heart is collected.  
+     * Returns if this was the first collection and a list of contributor IDs.
+     */
+    async collectHeart(celesteEvent: HeartCollectedEvent): Promise<[boolean, string[]]> {
+        let firstCollection = true;
+        
+        let contributors = await this.getChapterContributors(celesteEvent.chapterName, (event) => {
+            if(
+                event.type === EventType.CollectHeart &&
+                event.roomName === celesteEvent.roomName &&
+                event.chapterName === celesteEvent.chapterName
+            ) {
+                firstCollection = false;
+            }
+        });
+        
+
+        if(celesteEvent.color === HeartColor.Fake) {
+            contributors = (this.previousRoomContributors.get(celesteEvent.roomName) ?? []).concat(this.currentContributors);
+        }
+        
+        // Deduplicate contributors
+        const uniqueContributors = new Map<string, EventUser>();
+        for(const user of contributors) {
+            uniqueContributors.set(user.id, user);
+        }
+        contributors = Array.from(uniqueContributors.values());
+        
+        this.record({
+            type: EventType.CollectHeart,
+            newHeartCount: celesteEvent.newHeartCount,
+            roomName: celesteEvent.roomName,
+            chapterName: celesteEvent.chapterName,
+            contributors
+        });
+        
+        return [firstCollection, contributors.map(user => user.id)];
     }
     
     /**

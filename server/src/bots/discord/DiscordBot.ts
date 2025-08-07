@@ -5,7 +5,7 @@ import { getMaxFrames, getMinimumReactionsRequired, getReactionDebounce, shouldL
 import { ApplyContext, findEmojiMeaning } from "./EmojiMeaning";
 import { ChangeRoomResult, EventUser } from "../../EventRecorder";
 import { debounce } from "../../utils";
-import { ChangeRoomEvent, CompleteChapterEvent, StrawberryCollectedEvent } from "../../CelesteSocket";
+import { ChangeRoomEvent, CompleteChapterEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "../../CelesteSocket";
 
 export class DiscordBot extends Bot {
     private client: Client;
@@ -208,10 +208,34 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         const firstTimeText = event.isGhost ? "" : " for the first time";
         const wingedText = event.isWinged ? " winged" : "";
         if(event.isGolden) {
-            content += `## :strawberry: Collected **$${event.chapterName}**${wingedText} golden strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
+            content += `## :strawberry: Collected **${event.chapterName}**${wingedText} golden strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
         } else {
             content += `### :strawberry: Collected **${event.chapterName} ${event.roomName}**${wingedText} strawberry${firstTimeText}! ${event.newStrawberryCount}/175\n`;
         }
+        
+        content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
+        content += "-# Note: contributors may not be accurate; it's just a heuristic!";
+        
+        this.sendToChannel({
+            content,
+            flags: MessageFlags.SuppressEmbeds
+        });
+    }
+
+    public onHeartCollected(event: HeartCollectedEvent, firstCollection: boolean, contributors: string[]): void {
+        let content = "";
+        const firstTimeText = firstCollection ? " for the first time" : "";
+
+        let emoji = ({
+            [HeartColor.Blue]: ":blue_heart:",
+            [HeartColor.Red]: ":heart:",
+            [HeartColor.Gold]: ":yellow_heart:",
+            [HeartColor.Fake]: ":white_heart:"
+        })[event.color];
+
+        const fakeHeartText = event.color === HeartColor.Fake ? " (not including this fake one)" : "";
+
+        content += `### ${emoji} Collected **${event.chapterName}** crystal heart${firstTimeText}! ${event.newHeartCount} heart${event.newHeartCount === 1 ? "" : "s"} total${fakeHeartText}.\n`;
         
         content += `Contributors: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
         content += "-# Note: contributors may not be accurate; it's just a heuristic!";

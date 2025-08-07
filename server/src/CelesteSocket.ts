@@ -21,7 +21,8 @@ export enum CelesteToServerMessageType {
     StrawberryCollected = 0x04,
     ChangeRoom = 0x05,
     CompleteChapter = 0x06,
-    SetControlledChapter = 0x07
+    SetControlledChapter = 0x07,
+    HeartCollected = 0x08
 }
 
 export type FrameEvent = {
@@ -60,6 +61,20 @@ export type SetControlledChapterEvent = {
     reason: string | null;
 };
 
+export enum HeartColor {
+    Fake = "Fake",
+    Blue = "Blue",
+    Red = "Red",
+    Gold = "Gold"
+};
+
+export type HeartCollectedEvent = {
+    color: HeartColor;
+    roomName: string;
+    chapterName: string;
+    newHeartCount: number;
+};
+
 type CelesteEventMap = {
     connect: [];
     close: [];
@@ -68,6 +83,7 @@ type CelesteEventMap = {
     message: [string];
     playerDeath: [DeathEvent];
     strawberryCollected: [StrawberryCollectedEvent];
+    heartCollected: [HeartCollectedEvent];
     changeRoom: [ChangeRoomEvent];
     completeChapter: [CompleteChapterEvent];
     setControlledChapter: [SetControlledChapterEvent];
@@ -170,6 +186,11 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
                 case CelesteToServerMessageType.StrawberryCollected: {
                     const json = JSON.parse(payload.toString("utf8"));
                     this.emit("strawberryCollected", json as StrawberryCollectedEvent);
+                    break;
+                }
+                case CelesteToServerMessageType.HeartCollected: {
+                    const json = JSON.parse(payload.toString("utf8"));
+                    this.emit("heartCollected", json as HeartCollectedEvent);
                     break;
                 }
                 case CelesteToServerMessageType.ChangeRoom: {
