@@ -1,6 +1,6 @@
 import path from "path";
 import fs from "fs";
-import { AdvanceFrameData, StrawberryCollectedEvent } from "./CelesteSocket";
+import { AdvanceFrameData, ChangeRoomEvent, StrawberryCollectedEvent } from "./CelesteSocket";
 
 enum EventType {
     InputHistory = "inputHistory",
@@ -28,6 +28,7 @@ type GameEventData = {
     fromRoomName: string | null,
     toRoomName: string,
     chapterName: string,
+    reason: string,
     wasCleared: boolean,
     contributors: EventUser[]
 } | {
@@ -127,7 +128,9 @@ export class EventRecorder {
      * Run when the room is changed.  
      * Returns if this was the first time we've entered the new room and a list of contributor IDs.
      */
-    async changeRoom(fromRoomName: string | null, toRoomName: string, chapterName: string): Promise<ChangeRoomResult> {
+    async changeRoom(ev: ChangeRoomEvent): Promise<ChangeRoomResult> {
+        const { fromRoomName, toRoomName, chapterName, reason } = ev;
+
         let firstClear = true;
         for await(const event of this.streamEvents()) {
             if(event.type === EventType.ChangeRoom) {
@@ -158,7 +161,8 @@ export class EventRecorder {
             toRoomName,
             chapterName,
             contributors: contributors,
-            wasCleared: firstClear
+            wasCleared: firstClear,
+            reason
         });
         
         if(fromRoomName != null) {

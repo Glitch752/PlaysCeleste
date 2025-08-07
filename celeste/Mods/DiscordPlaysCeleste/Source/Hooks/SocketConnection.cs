@@ -77,11 +77,13 @@ public static class SocketConnection {
         public string fromRoomName { get; set; }
         public string toRoomName { get; set; }
         public string chapterName { get; set; }
+        public string reason { get; set; }
 
-        public ChangeRoomEvent(string fromRoomName, string toRoomName, string chapterName) {
+        public ChangeRoomEvent(string fromRoomName, string toRoomName, string chapterName, string reason) {
             this.fromRoomName = fromRoomName;
             this.toRoomName = toRoomName;
             this.chapterName = chapterName;
+            this.reason = reason;
         }
     }
     

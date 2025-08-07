@@ -75,7 +75,7 @@ class DiscordPlaysCelesteServer {
         });
         
         this.celesteSocket.on("changeRoom", async (event) => {
-            const result = await this.eventRecorder.changeRoom(event.fromRoomName, event.toRoomName, event.chapterName);
+            const result = await this.eventRecorder.changeRoom(event);
             this.bot.onRoomChange(event, result);
             this.descriptionManager.setRoom(event.toRoomName);
         });

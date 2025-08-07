@@ -48,6 +48,7 @@ export type ChangeRoomEvent = {
     fromRoomName: string | null;
     toRoomName: string;
     chapterName: string;
+    reason: string;
 };
 
 export type CompleteChapterEvent = {
