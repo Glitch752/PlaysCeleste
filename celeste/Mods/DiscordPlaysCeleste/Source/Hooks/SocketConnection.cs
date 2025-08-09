@@ -220,6 +220,9 @@ public static class SocketConnection {
                 string json = System.Text.Encoding.UTF8.GetString(payload);
                 GameState.SyncedState state = JsonSerializer.Deserialize<GameState.SyncedState>(json);
                 GameState.Instance.syncedState = state;
+                if(!state.ControlledByDiscord) {
+                    frameAdvanceEvents.Enqueue(new FrameAdvanceData());
+                }
                 return;
             }
             default:
