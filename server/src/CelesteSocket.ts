@@ -23,7 +23,8 @@ export enum CelesteToServerMessageType {
     CompleteChapter = 0x06,
     SetControlledChapter = 0x07,
     HeartCollected = 0x08,
-    CassetteCollected = 0x09
+    CassetteCollected = 0x09,
+    BindsChanged = 0x10
 }
 
 export type FrameEvent = {
@@ -84,6 +85,12 @@ export type CassetteCollectedEvent = {
     newCassetteCount: number;
 };
 
+export type BindsChangedEvent = {
+    binds: {
+        [bind: string]: string[]
+    }
+};
+
 type CelesteEventMap = {
     connect: [];
     close: [];
@@ -97,6 +104,7 @@ type CelesteEventMap = {
     changeRoom: [ChangeRoomEvent];
     completeChapter: [CompleteChapterEvent];
     setControlledChapter: [SetControlledChapterEvent];
+    bindsChanged: [BindsChangedEvent];
 };
 
 export class CelesteSocket extends EventEmitter<CelesteEventMap> {
@@ -221,6 +229,11 @@ export class CelesteSocket extends EventEmitter<CelesteEventMap> {
                 case CelesteToServerMessageType.SetControlledChapter: {
                     const json = JSON.parse(payload.toString("utf8"));
                     this.emit("setControlledChapter", json as SetControlledChapterEvent);
+                    break;
+                }
+                case CelesteToServerMessageType.BindsChanged: {
+                    const json = JSON.parse(payload.toString("utf8"));
+                    this.emit("bindsChanged", json as BindsChangedEvent);
                     break;
                 }
                 default:

@@ -52,5 +52,5 @@ Keys are only held until the next loop, so they must be repeated every time they
 TODO; this is a work-in-progress
 
 ## TODO
-- Track crystal hearts
+- Track keybind changes
 - Finish Twitch integration

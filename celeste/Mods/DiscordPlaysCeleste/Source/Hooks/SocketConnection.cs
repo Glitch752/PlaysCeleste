@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Threading;
@@ -13,7 +14,7 @@ public static class SocketConnection {
 
     [Initialize]
     private static void Initialize() {
-        socket = new ConcurrentSocket(SocketPath, OnMessageReceived);
+        socket = new ConcurrentSocket(SocketPath, OnMessageReceived, OnConnected);
     }
 
     [Unload]
@@ -155,6 +156,14 @@ public static class SocketConnection {
             this.newCassetteCount = newCassetteCount;
         }
     }
+    
+    public class BindsChangedEvent {
+        public Dictionary<string, string[]> binds { get; set; }
+        
+        public BindsChangedEvent(Dictionary<string, string[]> binds) {
+            this.binds = binds;
+        }
+    }
     #nullable disable
 
     private enum CelesteToServerMessageType {
@@ -166,7 +175,12 @@ public static class SocketConnection {
         CompleteChapter = 0x06,
         SetControlledChapter = 0x07,
         HeartCollected = 0x08,
-        CassetteCollected = 0x09
+        CassetteCollected = 0x09,
+        BindsChanged = 0x10
+    }
+    
+    public static void OnConnected() {
+        BindChanges.CheckForBindChange(false);
     }
     
     public static void OnMessageReceived(ConcurrentSocket.SocketMessage message) {
@@ -230,6 +244,11 @@ public static class SocketConnection {
     }
     
     private static void SendEvent<T>(CelesteToServerMessageType messageType, T eventData) {
+        if(socket == null) {
+            "Socket not initialized, cannot send event.".Log(LogLevel.Error);
+            return;
+        }
+        
         string json = JsonSerializer.Serialize(eventData);
         byte[] data = System.Text.Encoding.UTF8.GetBytes(json);
         socket.Send((byte)messageType, data);
@@ -243,6 +262,7 @@ public static class SocketConnection {
     public static void SendSetControlledChapter(SetControlledChapterEvent ev) => SendEvent(CelesteToServerMessageType.SetControlledChapter, ev);
     public static void SendHeartCollected(HeartCollectedEvent ev) => SendEvent(CelesteToServerMessageType.HeartCollected, ev);
     public static void SendCassetteCollected(CassetteCollectedEvent ev) => SendEvent(CelesteToServerMessageType.CassetteCollected, ev);
+    public static void SendBindsChanged(BindsChangedEvent ev) => SendEvent(CelesteToServerMessageType.BindsChanged, ev);
 
     public static FrameAdvanceData BlockUntilFrameAdvance() {
         FrameAdvanceData data;

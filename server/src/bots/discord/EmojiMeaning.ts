@@ -147,6 +147,32 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.wait("🕧", 0.5, 0),
 ];
 
+/**
+ * Maps from Celeste/XNA `Keys` to emojis
+ */
+const keyEmojis: { [key: string]: string } = Object.fromEntries([
+    // Regional indicators
+    ...Array.from({ length: 26 }, (_, i) => {
+        const letter = String.fromCharCode(65 + i);
+        return [letter, String.fromCodePoint(0x1F1E6 + i)]; // Regional indicator symbols A-Z
+    }),
+    
+    // Arrow keys
+    ["Up", "⬆️"],
+    ["Down", "⬇️"],
+    ["Left", "⬅️"],
+    ["Right", "➡️"],
+    
+    // Enter, Tab, Escape
+    ["Enter", "↩️"],
+    ["Tab", "↪️"],
+    ["Escape", "❌"]
+]);
+
 export function findEmojiMeaning(name: string | null): EmojiMeaning | null {
     return emojiMeanings.find(m => m.emoji === name) ?? null;
+}
+
+export function getEmojiForKey(key: string): string | null {
+    return keyEmojis[key] ?? null;
 }

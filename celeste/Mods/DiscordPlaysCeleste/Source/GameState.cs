@@ -46,10 +46,10 @@ public class GameState {
         /// If false, the game is being manually controlled instead.
         /// </summary>
         public bool ControlledByDiscord { get; set; } = true;
-        
-        public override string ToString() {
-            return $"ControlledByDiscord: {ControlledByDiscord}";
-        }
+        /// <summary>
+        /// If we should override debug mode to be off.
+        /// </summary>
+        public bool OverrideDebugMode { get; set; } = false;
     }
     
     /// <summary>

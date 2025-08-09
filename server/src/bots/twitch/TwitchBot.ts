@@ -11,7 +11,7 @@ export class TwitchBot extends Bot {
     private static CELESTE_GAME_ID: string = "492535";
     
     constructor() {
-        super();
+        super({});
         
         this.client = new Client({
             options: { debug: true },
@@ -43,7 +43,7 @@ export class TwitchBot extends Bot {
         });
     }
     
-    public updateDescription(description: string): void {
+    public onDescriptionChange(description: string): void {
         // TODO
     }
     
@@ -76,6 +76,10 @@ export class TwitchBot extends Bot {
     }
 
     public onCassetteConnected(event: CassetteCollectedEvent, contributors: string[]): void {
+        // TODO
+    }
+    
+    public onBindsChanged(diff: { [bind: string]: string[]; }): void {
         // TODO
     }
 }

@@ -17,13 +17,11 @@ class DiscordPlaysCelesteServer {
     private framesReceived = 0;
 
     private eventRecorder: EventRecorder;
-    private descriptionManager: DescriptionManager;
 
     constructor(
         private bot: Bot
     ) {
         this.eventRecorder = new EventRecorder();
-        this.descriptionManager = new DescriptionManager(this.bot.updateDescription.bind(this.bot));
         this.celesteSocket = new CelesteSocket();
 
         this.setupCelesteSocketEvents();
@@ -53,7 +51,7 @@ class DiscordPlaysCelesteServer {
 
             this.bot.onScreenshot(pngBuffer);
             
-            this.descriptionManager.addTurn();
+            this.bot.descriptionManager.addTurn();
         });
 
         this.celesteSocket.on("message", (msg) => {
@@ -65,13 +63,13 @@ class DiscordPlaysCelesteServer {
         this.celesteSocket.on("playerDeath", (event) => {
             this.bot.onDeath(event.newDeathCount);
             this.eventRecorder.playerDeath(event.newDeathCount);
-            this.descriptionManager.onDeath(event.newDeathCount);
+            this.bot.descriptionManager.onDeath(event.newDeathCount);
         });
         
         this.celesteSocket.on("strawberryCollected", async (event) => {
             const contributors = await this.eventRecorder.collectStrawberry(event);
             this.bot.onStrawberryCollected(event, contributors);
-            this.descriptionManager.setStrawberryCount(event.newStrawberryCount);
+            this.bot.descriptionManager.setStrawberryCount(event.newStrawberryCount);
         });
 
         this.celesteSocket.on("heartCollected", (event) => {
@@ -87,7 +85,7 @@ class DiscordPlaysCelesteServer {
         this.celesteSocket.on("changeRoom", async (event) => {
             const result = await this.eventRecorder.changeRoom(event);
             this.bot.onRoomChange(event, result);
-            this.descriptionManager.setRoom(event.toRoomName);
+            this.bot.descriptionManager.setRoom(event.toRoomName);
         });
         
         this.celesteSocket.on("completeChapter", async (event) => {
@@ -99,7 +97,15 @@ class DiscordPlaysCelesteServer {
             if(event.chapter != null) console.log(`Set controlled chapter to ${event.chapter}`);
             else console.log("Cleared controlled chapter");
             this.eventRecorder.setControlledChapter(event.chapter, event.reason);
-            this.descriptionManager.setChapter(event.chapter);
+            this.bot.descriptionManager.setChapter(event.chapter);
+        });
+        
+        this.celesteSocket.on("bindsChanged", (event) => {
+            console.log("Received new binds");
+            const diff = this.bot.descriptionManager.setBinds(event.binds);
+            if(Object.keys(diff).length > 0) {
+                this.bot.onBindsChanged(diff);
+            }
         });
 
         this.celesteSocket.on("close", () => {
@@ -139,7 +145,6 @@ class DiscordPlaysCelesteServer {
             });
             
             this.initCeleste();
-            this.bot.updateDescription(this.descriptionManager.getDescription());
             
             this.initializedDiscord = true; 
         });

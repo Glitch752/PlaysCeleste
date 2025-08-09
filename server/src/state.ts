@@ -6,10 +6,15 @@ export type SyncedState = {
      * If false, the game is being manually controlled instead.
      */
     ControlledByDiscord: boolean;
+    /**
+     * Whether we should override debug mode to be off.
+     */
+    OverrideDebugMode: boolean;
 };
 
 let state = new PersistentData<SyncedState>({
-    ControlledByDiscord: true
+    ControlledByDiscord: true,
+    OverrideDebugMode: true
 }, "state.json");
 
 export function getSyncedState(): SyncedState {

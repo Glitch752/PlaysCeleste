@@ -10,13 +10,15 @@ import { CassetteCollectedEvent, ChangeRoomEvent, CompleteChapterEvent, HeartCol
 export class DiscordBot extends Bot {
     private client: Client;
     private gameplayMessageID: string | null = null;
-    private description: string = "";
     private lastInfoTime: number | null = null;
     
     private reactionsFinishedDebounce: (reactions: ReactionManager) => void;
     
     constructor() {
-        super();
+        super({
+            // Description updates are rate-limited to 2 requests per 10 minutes (why is it so restrictive??)
+            descriptionDebounce: 1000 * (60 * 5 + 1)
+        });
         
         this.client = new Client({
             intents: [
@@ -37,8 +39,7 @@ export class DiscordBot extends Bot {
         this.client.login(config.DISCORD_TOKEN);
     }
     
-    public async updateDescription(description: string) {
-        this.description = description;
+    public async onDescriptionChange(description: string) {
         const channel = this.client.channels.cache.get(config.CHANNEL_ID);
         if(channel && channel.isTextBased()) {
             (channel as TextChannel).setTopic(`See <#1396661382782517401>!   ${description}
@@ -48,6 +49,11 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
     }
 
     private async sendToChannel(options: MessageCreateOptions): Promise<Message | null> {
+        // Wait for the bot to be ready if it's not
+        if(!this.client.isReady()) {
+            await new Promise(resolve => this.client.once("ready", resolve));
+        }
+        
         const channel = this.client.channels.cache.get(config.CHANNEL_ID);
         if(channel && channel.isTextBased()) {
             return await (channel as TextChannel).send(options);
@@ -116,6 +122,8 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
             console.log("Discord client ready!");
 
             this.emit("ready");
+            
+            this.onDescriptionChange(this.descriptionManager.getShortDescription());
         });
 
         this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
@@ -130,13 +138,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
 
             if(reaction.message.id === this.gameplayMessageID && user.id != this.client.user?.id) {
                 if(reaction.emoji.name === "ℹ️") {
-                    if(this.lastInfoTime === null || (Date.now() - this.lastInfoTime) > 5000) {
-                        this.lastInfoTime = Date.now();
-                        await this.sendToChannel({
-                            content: this.description,
-                            flags: MessageFlags.SuppressEmbeds
-                        });
-                    }
+                    this.infoReaction();
                     return;
                 }
                 
@@ -144,6 +146,16 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
                 this.reactionsFinishedDebounce(reaction.message.reactions);
             }
         });
+    }
+    
+    private async infoReaction() {
+        if(this.lastInfoTime === null || (Date.now() - this.lastInfoTime) > 120_000) {
+            this.lastInfoTime = Date.now();
+            await this.sendToChannel({
+                content: this.descriptionManager.getLongDescription(),
+                flags: MessageFlags.SuppressEmbeds
+            });
+        }
     }
     
     private setupSketchyErrorHandling() {
@@ -290,6 +302,15 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         }
         content += `Completion team: ${contributors.map(id => `<@${id}>`).join(", ")}\n`;
         content += "-# Note: completion team may not be accurate; it's just a heuristic!";
+        
+        this.sendToChannel({
+            content,
+            flags: MessageFlags.SuppressEmbeds
+        });
+    }
+    
+    public onBindsChanged(diff: { [bind: string]: string[]; }): void {
+        let content = `Bind${Object.keys(diff).length !== 1 ? "s" : ""} changed:\n${this.descriptionManager.getBindDescription(diff, false)}`;
         
         this.sendToChannel({
             content,

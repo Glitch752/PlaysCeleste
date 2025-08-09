@@ -13,9 +13,13 @@ public class ConcurrentSocket {
     // Callback to handle incoming messages
     public Action<SocketMessage> OnMessageReceived;
     
-    public ConcurrentSocket(string socketPath, Action<SocketMessage> onMessageReceived) {
+    // Callback for when the socket connects or reconnects
+    public Action OnConnected;
+    
+    public ConcurrentSocket(string socketPath, Action<SocketMessage> onMessageReceived, Action onConnected) {
         this.socketPath = socketPath;
         OnMessageReceived = onMessageReceived;
+        OnConnected = onConnected;
         
         // Start listening for messages.
         StartListening();
@@ -41,6 +45,9 @@ public class ConcurrentSocket {
             "Waiting for server socket connection...".Log();
             socket = socket.Accept();
             "Server socket connected.".Log();
+            
+            // Run OnConnected in a task so we wait for the ctor to finish
+            Task.Run(() => OnConnected?.Invoke());
         } catch(SocketException e) {
             $"Socket connection failed: {e.Message}".Log(LogLevel.Error);
             Close();
