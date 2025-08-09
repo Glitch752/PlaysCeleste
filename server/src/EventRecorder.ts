@@ -11,7 +11,8 @@ enum EventType {
     CollectCassette = "collectCassette",
     Death = "death",
     Message = "message",
-    SetControlledChapter = "setControlledChapter"
+    SetControlledChapter = "setControlledChapter",
+    BindsChanged = "bindsChanged"
 }
 
 export type EventUser = {
@@ -72,6 +73,9 @@ type GameEventData = {
     type: EventType.SetControlledChapter,
     chapter: string | null,
     reason: string | null
+} | {
+    type: EventType.BindsChanged,
+    binds: Record<string, string[]>
 };
 
 export type ChangeRoomResult = {
@@ -342,6 +346,16 @@ export class EventRecorder {
             type: EventType.Death,
             contributors: this.currentContributors,
             newDeathCount
+        });
+    }
+    
+    /**
+     * Run when the binds change.
+     */
+    bindsChanged(binds: Record<string, string[]>) {
+        this.record({
+            type: EventType.BindsChanged,
+            binds
         });
     }
     

@@ -104,6 +104,7 @@ class DiscordPlaysCelesteServer {
             console.log("Received new binds");
             const diff = this.bot.descriptionManager.setBinds(event.binds);
             if(Object.keys(diff).length > 0) {
+                this.eventRecorder.bindsChanged(event.binds);
                 this.bot.onBindsChanged(diff);
             }
         });
