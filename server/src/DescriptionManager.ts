@@ -56,10 +56,10 @@ export class DescriptionManager {
     }
     
     public getLongDescription(): string {
-        return `${this.getShortDescription()}
+        return `Current binds:
+${this.getBindDescription(this.descriptionData.data.binds)}
 
-Current binds:
-${this.getBindDescription(this.descriptionData.data.binds)}`;
+${this.getShortDescription()}`;
     }
     
     public getBindDescription(binds: { [bind: string]: string[] }, skipEmpty: boolean = true): string {
