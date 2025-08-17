@@ -5,6 +5,7 @@ dotenv.config();
 const {
     BOT_TO_USE,
     DISCORD_TOKEN, DISCORD_CLIENT_ID, CHANNEL_ID,
+    INFO_CHANNEL_ID,
     TWITCH_CHANNEL, TWITCH_BOT_USERNAME, TWITCH_BOT_PASSWORD
 } = process.env;
 
@@ -25,6 +26,7 @@ if(BOT_TO_USE === "discord") {
     checkEnvVar("DISCORD_TOKEN");
     checkEnvVar("DISCORD_CLIENT_ID");
     checkEnvVar("CHANNEL_ID");   
+    checkEnvVar("INFO_CHANNEL_ID");
 } else {
     checkEnvVar("TWITCH_CHANNEL");
     checkEnvVar("TWITCH_BOT_USERNAME");
@@ -37,6 +39,8 @@ export const config = {
     DISCORD_TOKEN: DISCORD_TOKEN ?? "",
     DISCORD_CLIENT_ID: DISCORD_CLIENT_ID ?? "",
     CHANNEL_ID: CHANNEL_ID ?? "",
+    
+    INFO_CHANNEL_ID: INFO_CHANNEL_ID ?? "",
     
     TWITCH_CHANNEL: TWITCH_CHANNEL ?? "",
     TWITCH_BOT_USERNAME: TWITCH_BOT_USERNAME ?? "",

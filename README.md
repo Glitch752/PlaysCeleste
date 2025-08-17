@@ -2,6 +2,8 @@
 
 This project was originally named "Discord Plays Celeste" as a Discord bot to allow distributed gameplay of [Celeste](https://www.celestegame.com/) by presenting the game one screenshot at a time with interactive controls. However, I've also expanded to a Twitch bot controlled by the same Celeste mod.
 
+[Demo Discord server](https://discord.gg/A26vE4qKcA)
+
 ## What is this?
 This is a little project to allow distributed gameplay of [Celeste](https://www.celestegame.com/) on various social platforms not... really meant for it. The game is presented one screenshot at a time, while users vote to decide on the next keys to hold and how many frames to advance the game. This is, in a way, similar to Celeste TAS runs, except in real time; in fact, I have tooling in place to convert the final run to a TAS!
 

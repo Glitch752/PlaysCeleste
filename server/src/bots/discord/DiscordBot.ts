@@ -42,7 +42,7 @@ export class DiscordBot extends Bot {
     public async onDescriptionChange(description: string) {
         const channel = this.client.channels.cache.get(config.CHANNEL_ID);
         if(channel && channel.isTextBased()) {
-            (channel as TextChannel).setTopic(`See <#1396661382782517401>!   ${description}
+            (channel as TextChannel).setTopic(`See <#${config.INFO_CHANNEL_ID}>!   ${description}
                     
 Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         }
@@ -184,7 +184,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
     
     public async onScreenshot(pngBuffer: Buffer) {
         const message = await this.sendToChannel({
-            content: `See <#1396661382782517401> for how to play, or react with ℹ️ for more.`,
+            content: `See <#${config.INFO_CHANNEL_ID}> for how to play, or react with ℹ️ for more.`,
             files: [new AttachmentBuilder(pngBuffer, {
                 name: "celeste.png"
             })]
