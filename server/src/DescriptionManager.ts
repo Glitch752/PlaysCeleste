@@ -1,4 +1,3 @@
-import { getEmojiForKey } from "./bots/discord/EmojiMeaning";
 import { PersistentData } from "./PersistentData";
 import { formatList } from "./utils";
 
@@ -54,15 +53,15 @@ export class DescriptionManager {
             return `No room controlled   🍓 ${data.strawberryCount}/175   ${data.deathCount} deaths (${data.turnsSinceDeath} turn${data.turnsSinceDeath != 1 ? "s" : ""} since last)`;
         }
     }
-    
-    public getLongDescription(): string {
+
+    public getLongDescription(getEmojiForKey: (key: string) => string | null): string {
         return `Current binds:
-${this.getBindDescription(this.descriptionData.data.binds)}
+${this.getBindDescription(this.descriptionData.data.binds, true, getEmojiForKey)}
 
 ${this.getShortDescription()}`;
     }
-    
-    public getBindDescription(binds: { [bind: string]: string[] }, skipEmpty: boolean = true): string {
+
+    public getBindDescription(binds: { [bind: string]: string[] }, skipEmpty: boolean = true, getEmojiForKey: (key: string) => string | null): string {
         return Object.entries(binds)
             .filter(([_, keys]) => !skipEmpty || keys.length > 0)
             .sort(([a, b]) => a[0].localeCompare(b[0]))

@@ -27,6 +27,10 @@ if(BOT_TO_USE === "discord") {
     checkEnvVar("DISCORD_CLIENT_ID");
     checkEnvVar("CHANNEL_ID");   
     checkEnvVar("INFO_CHANNEL_ID");
+} else if(BOT_TO_USE === "slack") {
+    checkEnvVar("SLACK_BOT_TOKEN");
+    checkEnvVar("SLACK_APP_TOKEN");
+    checkEnvVar("SLACK_SIGNING_SECRET");
 } else {
     checkEnvVar("TWITCH_CHANNEL");
     checkEnvVar("TWITCH_BOT_USERNAME");
@@ -44,5 +48,9 @@ export const config = {
     
     TWITCH_CHANNEL: TWITCH_CHANNEL ?? "",
     TWITCH_BOT_USERNAME: TWITCH_BOT_USERNAME ?? "",
-    TWITCH_BOT_PASSWORD: TWITCH_BOT_PASSWORD ?? ""
+    TWITCH_BOT_PASSWORD: TWITCH_BOT_PASSWORD ?? "",
+
+    SLACK_BOT_TOKEN: process.env.SLACK_BOT_TOKEN ?? "",
+    SLACK_APP_TOKEN: process.env.SLACK_APP_TOKEN ?? "",
+    SLACK_SIGNING_SECRET: process.env.SLACK_SIGNING_SECRET ?? "",
 };

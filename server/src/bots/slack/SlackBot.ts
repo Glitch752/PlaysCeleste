@@ -1,69 +1,163 @@
-import { AttachmentBuilder, Client, Events, GatewayIntentBits, Message, MessageCreateOptions, MessageFlags, ReactionManager, TextChannel } from "discord.js";
 import { Bot } from "../Bot";
 import { config } from "../../config";
 import { getMaxFrames, getMinimumReactionsRequired, getReactionDebounce, shouldLogDeaths } from "../../settings";
-import { ApplyContext, findEmojiMeaning, getEmojiForKey } from "./EmojiMeaning";
+import { ApplyContext, findEmojiMeaning, getEmojiForKey } from "./SlackEmojiMeaning";
 import { ChangeRoomResult, EventUser } from "../../EventRecorder";
 import { debounce } from "../../utils";
 import { CassetteCollectedEvent, ChangeRoomEvent, CompleteChapterEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "../../CelesteSocket";
+import { App } from "@slack/bolt";
 
-export class DiscordBot extends Bot {
-    private client: Client;
+export class SlackBot extends Bot {
+    private client: App;
+    
     private gameplayMessageID: string | null = null;
     private lastInfoTime: number | null = null;
     
-    private reactionsFinishedDebounce: (reactions: ReactionManager) => void;
+    private reactionsFinishedDebounce: (messageID: string) => void;
     
     constructor() {
         super({
-            // Description updates are rate-limited to 2 requests per 10 minutes (why is it so restrictive??)
-            descriptionDebounce: 1000 * (60 * 5 + 1)
+            descriptionDebounce: 10000 // 10 seconds
         });
         
-        this.client = new Client({
-            intents: [
-                GatewayIntentBits.Guilds,
-                GatewayIntentBits.GuildMessages,
-                GatewayIntentBits.GuildMessageReactions
-            ],
-            rest: {
-                timeout: 60_000,
-            }
+        this.client = new App({
+            token: config.SLACK_BOT_TOKEN,
+            signingSecret: config.SLACK_SIGNING_SECRET,
+            appToken: config.SLACK_APP_TOKEN,
+            socketMode: true
         });
         
         this.reactionsFinishedDebounce = debounce(this.updateReactions.bind(this), () => getReactionDebounce() * 1000);
         
         this.setupClientEvents();
         this.setupSketchyErrorHandling();
-        
-        this.client.login(config.DISCORD_TOKEN);
     }
     
     public async onDescriptionChange(description: string) {
-        const channel = this.client.channels.cache.get(config.CHANNEL_ID);
-        if(channel && channel.isTextBased()) {
-            (channel as TextChannel).setTopic(`See <#${config.INFO_CHANNEL_ID}>!   ${description}
-                    
-Info may be out-of-date due to severe rate-limiting on Discord's side.`);
-        }
+        // TODO: Figure out how to do this w/o sending a funky message
+        // await this.client.client.conversations.setTopic({
+        //     channel: config.CHANNEL_ID,
+        //     topic: `See the info canvas!   ${description}`
+        // });
     }
 
-    private async sendToChannel(options: MessageCreateOptions): Promise<Message | null> {
-        // Wait for the bot to be ready if it's not
-        if(!this.client.isReady()) {
-            await new Promise(resolve => this.client.once("ready", resolve));
+    private async sendToChannel(options: {
+        content: string;
+        ephemeral?: string; // user ID
+        files?: { buf: Buffer; filename: string }[];
+    }): Promise<{
+        id: string;
+    } | null> {
+        let fileIDs = [];
+
+        if(options.files) {
+            for(const file of options.files) {
+                const url = await this.client.client.files.uploadV2({
+                    filename: file.filename,
+                    file: file.buf,
+                    title: "Celeste screenshot"
+                });
+
+                // @ts-ignore
+                const id: string = url.files?.[0]?.files?.[0]?.id ?? "";
+
+                // Wait for it to finish uploading.
+                // WE NEED TO POLL FOR THIS?? Who at slack came up with this shit 🥀
+
+                let fileExists = false;
+                for(let i = 0; i < 25; i++) {
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    const info = await this.client.client.files.info({
+                        file: id
+                    });
+                    if(info?.file?.mimetype !== "") {
+                        fileExists = true;
+                        break;
+                    }
+                    console.log(`Image upload poll ${i} failed...`);
+                }
+
+                if(!fileExists) {
+                    console.error("File upload failed");
+                    return null;
+                }
+
+                fileIDs.push(id);
+                console.log(fileIDs);
+            }
         }
-        
-        const channel = this.client.channels.cache.get(config.CHANNEL_ID);
-        if(channel && channel.isTextBased()) {
-            return await (channel as TextChannel).send(options);
+
+        try {
+            if(options.ephemeral) {
+                const result = await this.client.client.chat.postEphemeral({
+                    channel: config.CHANNEL_ID,
+                    user: options.ephemeral,
+                    markdown_text: options.content
+                });
+
+                if(result.ok) {
+                    return {
+                        id: result.message_ts ?? "unknown"
+                    };
+                }
+
+                console.error("Error sending ephemeral message:", result.error);
+                return null;
+            }
+
+            const result = await this.client.client.chat.postMessage({
+                channel: config.CHANNEL_ID,
+                text: options.content,
+                blocks: [
+                    ...options.files ? fileIDs.map(id => ({
+                        type: "image",
+                        slack_file: {
+                            id
+                        },
+                        alt_text: "Celeste screenshot"
+                    })) : [],
+                    {
+                        type: "section",
+                        text: {
+                            type: "mrkdwn",
+                            text: options.content
+                        }
+                    }
+                ]
+            });
+
+            if(result.ok) {
+                return {
+                    id: result.ts ?? "unknown"
+                };
+            }
+            console.error("Error sending message:", result.error);
+        } catch (e) {
+            console.error("Exception sending message:", e);
         }
+
         return null;
     }
     
-    private async updateReactions(reactions: ReactionManager) {
+    private async updateReactions(messageID: string) {
+        // Query reactions for the message
+        const result = await this.client.client.reactions.get({
+            channel: config.CHANNEL_ID,
+            timestamp: messageID
+        });
+        if(!result.message) {
+            console.error("No message found for reactions get");
+            return;
+        }
+
+        const reactions = result.message.reactions;
+        if(!reactions) {
+            console.log("No reactions on message");
+            return;
+        }
+
         // Find all reactions with more than MINIMUM_REACTIONS_REQUIRED reactions
-        let validReactions = [...reactions.cache.values()].filter(r => r.count >= getMinimumReactionsRequired());
+        let validReactions = reactions.filter(r => (r.count ?? 0) >= getMinimumReactionsRequired());
         if(validReactions.length === 0) {
             // This isn't valid yet
             return;
@@ -72,7 +166,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         // Apply all the reactions to a new context and continue only if the resulting context is valid
         const context = new ApplyContext();
         validReactions = validReactions.filter(reaction => {
-            const meaning = findEmojiMeaning(reaction.emoji.name);
+            const meaning = findEmojiMeaning(reaction.name ?? null);
             if(meaning) meaning.apply(context);
             return meaning !== null;
         });
@@ -82,10 +176,10 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         }
         
         let contributors = validReactions.flatMap(r => {
-            return r.users.cache.map(u => ({
-                id: u.id,
-                username: u.username
-            })).filter(u => u.id !== this.client.user?.id);
+            return (r.users ?? []).map(u => ({
+                id: u,
+                username: u // We don't have usernames here; just use ID
+            }));
         }).filter(u => u !== null);
         
         // Deduplicate contributors
@@ -108,8 +202,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         const maxFrames = getMaxFrames();
         if(advanceData.FramesToAdvance > maxFrames) {
             this.sendToChannel({
-                content: `[${advanceData.FramesToAdvance} frames??](https://discord.com/channels/1396648547708829778/1396661370757447680/1396944113743560894) Capped to ${maxFrames}.`,
-                flags: MessageFlags.SuppressEmbeds
+                content: `${advanceData.FramesToAdvance} frames?? Capped to ${maxFrames}.`,
             });
             advanceData.FramesToAdvance = maxFrames;
         }
@@ -118,42 +211,41 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
     }
     
     private setupClientEvents() {
-        this.client.once("ready", async () => {
-            console.log("Discord client ready!");
+        this.client.start().then(() => {
+            console.log("Slack client ready!");
 
             this.emit("ready");
             
             this.onDescriptionChange(this.descriptionManager.getShortDescription());
         });
 
-        this.client.on(Events.MessageReactionAdd, async (reaction, user) => {
-            if (reaction.partial) {
-                try {
-                    await reaction.fetch();
-                } catch(error) {
-                    console.log(`Error fetching partial reaction: ${error}`);
-                    return;
-                }
+        this.client.event("reaction_added", async ({ event }) => {
+            try {
+                console.log(`Reaction added: ${event.reaction} to message: ${event.item.ts}`);
+                // Respond to the reaction (could be sending a message or performing an action)
+            } catch (error) {
+                console.error('Error handling reaction:', error);
             }
 
-            if(reaction.message.id === this.gameplayMessageID && user.id != this.client.user?.id) {
-                if(reaction.emoji.name === "ℹ️") {
-                    this.infoReaction();
+            const emoji = event.reaction;
+            if(event.item.ts === this.gameplayMessageID) {
+                if(["information_source", "tw_information_source"].includes(emoji)) {
+                    this.infoReaction(event.user);
                     return;
                 }
                 
-                console.log(`Received ${reaction.emoji.name} reaction to latest message`);
-                this.reactionsFinishedDebounce(reaction.message.reactions);
+                console.log(`Received ${emoji} reaction to latest message`);
+                this.reactionsFinishedDebounce(this.gameplayMessageID);
             }
         });
     }
     
-    private async infoReaction() {
+    private async infoReaction(user: string) {
         if(this.lastInfoTime === null || (Date.now() - this.lastInfoTime) > 120_000) {
             this.lastInfoTime = Date.now();
             await this.sendToChannel({
                 content: this.descriptionManager.getLongDescription(getEmojiForKey),
-                flags: MessageFlags.SuppressEmbeds
+                ephemeral: user
             });
         }
     }
@@ -162,8 +254,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         process.on("uncaughtException", (error) => {
             console.error("Uncaught Exception:", error);
             this.sendToChannel({
-                content: `<:annoyedeline:1396712320452792452> An error occurred; Discord is probably rate limiting us. Wait a few seconds, and we'll restart the bot. <@601206663059603487> ahhh something went wrong`,
-                flags: MessageFlags.SuppressEmbeds
+                content: `:annoyedline: An error occurred; Slack is probably rate limiting us. Wait a few seconds, and we'll restart the bot. <@U078QP0J4EM> ahhh something went wrong`,
             });
             
             this.gameplayMessageID = null;
@@ -173,8 +264,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         process.on("unhandledRejection", (reason, promise) => {
             console.error("Unhandled Rejection at:", promise, "reason:", reason);
             this.sendToChannel({
-                content: `<:annoyedeline:1396712320452792452> An error occurred; Discord is probably rate limiting us. Wait a few seconds, and we'll restart the bot. <@601206663059603487> ahhh something went wrong`,
-                flags: MessageFlags.SuppressEmbeds
+                content: `:annoyedline: An error occurred; Slack is probably rate limiting us. Wait a few seconds, and we'll restart the bot. <@U078QP0J4EM> ahhh something went wrong`,
             });
             
             this.gameplayMessageID = null;
@@ -184,10 +274,11 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
     
     public async onScreenshot(pngBuffer: Buffer) {
         const message = await this.sendToChannel({
-            content: `See <#${config.INFO_CHANNEL_ID}> for how to play, or react with ℹ️ for more.`,
-            files: [new AttachmentBuilder(pngBuffer, {
-                name: "celeste.png"
-            })]
+            content: `See the info canvas for how to play, or react with ℹ️ for more.`,
+            files: [{
+                buf: pngBuffer,
+                filename: "celeste.png"
+            }]
         });
         
         this.lastInfoTime = null;
@@ -202,16 +293,14 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
     public onDeath(_newDeathCount: number): void {
         if(shouldLogDeaths()) {
             this.sendToChannel({
-                content: "<:annoyedeline:1396712320452792452> Madeline died",
-                flags: MessageFlags.SuppressEmbeds
+                content: ":annoyedline: Madeline died"
             });
         }
     }
     
     public onMessage(msg: string): void {
         this.sendToChannel({
-            content: msg,
-            flags: MessageFlags.SuppressEmbeds
+            content: msg
         });
     }
     
@@ -230,12 +319,11 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         
         this.sendToChannel({
             content,
-            flags: MessageFlags.SuppressEmbeds
         });
 
         if(event.newStrawberryCount >= 202) {
             this.sendToChannel({
-                content: "<:hyperfrogeline:1401669754263048313> what"
+                content: ":surprised: what"
             });
         }
     }
@@ -249,8 +337,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         content += "-# Note: contributors may not be accurate; it's just a heuristic!";
         
         this.sendToChannel({
-            content,
-            flags: MessageFlags.SuppressEmbeds
+            content
         });
     }
 
@@ -273,8 +360,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         content += "-# Note: contributors may not be accurate; it's just a heuristic!";
         
         this.sendToChannel({
-            content,
-            flags: MessageFlags.SuppressEmbeds
+            content
         });
     }
     
@@ -287,8 +373,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
             content += "-# Note: contributors may not be accurate; it's just a heuristic!";
             
             this.sendToChannel({
-                content,
-                flags: MessageFlags.SuppressEmbeds
+                content
             });
         }
     }
@@ -304,8 +389,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         content += "-# Note: completion team may not be accurate; it's just a heuristic!";
         
         this.sendToChannel({
-            content,
-            flags: MessageFlags.SuppressEmbeds
+            content
         });
     }
     
@@ -313,8 +397,7 @@ Info may be out-of-date due to severe rate-limiting on Discord's side.`);
         let content = `Bind${Object.keys(diff).length !== 1 ? "s" : ""} changed:\n${this.descriptionManager.getBindDescription(diff, false, getEmojiForKey)}`;
         
         this.sendToChannel({
-            content,
-            flags: MessageFlags.SuppressEmbeds
+            content
         });
     }
 }

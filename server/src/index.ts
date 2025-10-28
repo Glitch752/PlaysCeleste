@@ -8,6 +8,7 @@ import { Bot } from "./bots/Bot";
 import { DiscordBot } from "./bots/discord/DiscordBot";
 import { config } from "./config";
 import { TwitchBot } from "./bots/twitch/TwitchBot";
+import { SlackBot } from "./bots/slack/SlackBot";
 
 class DiscordPlaysCelesteServer {
     private celesteSocket: CelesteSocket;
@@ -38,18 +39,31 @@ class DiscordPlaysCelesteServer {
             }
         });
 
+        let processingFrame = false;
         this.celesteSocket.on("screenshotData", async (frame) => {
-            console.log(`Received ${frame.width}x${frame.height} frame (${this.framesReceived++})`);
+            if(processingFrame) {
+                return; // Whaaaa
+            }
 
-            // Encode as PNG and save
-            let arrayBuf = Uint8Array.from(frame.data).buffer;
-            let width = frame.width, height = frame.height;
-            [arrayBuf, width, height] = cropImage(arrayBuf, frame.width, frame.height);
+            processingFrame = true;
 
-            const pngArrayBuffer = UPNG.encode([arrayBuf], width, height, 256);
-            const pngBuffer = Buffer.from(pngArrayBuffer);
+            try {
+                console.log(`Received ${frame.width}x${frame.height} frame (${this.framesReceived++})`);
 
-            this.bot.onScreenshot(pngBuffer);
+                // Encode as PNG and save
+                let arrayBuf = Uint8Array.from(frame.data).buffer;
+                let width = frame.width, height = frame.height;
+                [arrayBuf, width, height] = cropImage(arrayBuf, frame.width, frame.height);
+
+                const pngArrayBuffer = UPNG.encode([arrayBuf], width, height, 256);
+                const pngBuffer = Buffer.from(pngArrayBuffer);
+
+                await this.bot.onScreenshot(pngBuffer);
+            } catch (e) {
+                console.error("Error processing screenshot:", e);
+            } finally {
+                processingFrame = false;
+            }
             
             this.bot.descriptionManager.addTurn();
         });
@@ -170,4 +184,15 @@ class DiscordPlaysCelesteServer {
     }
 }
 
-new DiscordPlaysCelesteServer(config.BOT_TO_USE === "discord" ? new DiscordBot() : new TwitchBot());
+if(config.BOT_TO_USE === "discord") {
+    console.log("Starting Discord bot...");
+    new DiscordPlaysCelesteServer(new DiscordBot());
+} else if(config.BOT_TO_USE === "twitch") {
+    console.log("Starting Twitch bot...");
+    new DiscordPlaysCelesteServer(new TwitchBot());
+} else if(config.BOT_TO_USE === "slack") {
+    console.log("Starting Slack bot...");
+    new DiscordPlaysCelesteServer(new SlackBot());
+} else {
+    throw new Error(`Unknown BOT_TO_USE: ${config.BOT_TO_USE}`);
+}
