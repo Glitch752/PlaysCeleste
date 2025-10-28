@@ -149,7 +149,7 @@ const emojiMeanings: EmojiMeaning[] = [
 
         // A-Z keys can be in the format :a:, :a_1:, :a_10:, etc.
         return EmojiMeaning.holdKey(new RegExp(
-            `^:${key.toLowerCase()}(_\\d+)?$`
+            `^${key.toLowerCase()}(_\\d+)?$`
         ), key)
     }),
     
