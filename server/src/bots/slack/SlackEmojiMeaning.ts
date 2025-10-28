@@ -38,12 +38,12 @@ export class ApplyContext {
 
 export class EmojiMeaning {
     constructor(
-        public emoji: string,
+        public emoji: string | RegExp,
         public apply: (ctx: ApplyContext) => void
     ) {
     }
     
-    public static holdKey(emoji: string, key: string): EmojiMeaning {
+    public static holdKey(emoji: string | RegExp, key: string): EmojiMeaning {
         return new EmojiMeaning(
             emoji,
             (ctx) => {
@@ -52,7 +52,7 @@ export class EmojiMeaning {
         );
     }
     
-    public static holdKeys(emoji: string, keys: string[]): EmojiMeaning {
+    public static holdKeys(emoji: string | RegExp, keys: string[]): EmojiMeaning {
         return new EmojiMeaning(
             emoji,
             (ctx) => {
@@ -61,7 +61,7 @@ export class EmojiMeaning {
         );
     }
     
-    public static wait(emoji: string, seconds: number, frames: number): EmojiMeaning {
+    public static wait(emoji: string | RegExp, seconds: number, frames: number): EmojiMeaning {
         return new EmojiMeaning(
             emoji,
             (ctx) => {
@@ -70,7 +70,7 @@ export class EmojiMeaning {
         );
     }
     
-    public static waitMultiplier(emoji: string, multiplier: number): EmojiMeaning {
+    public static waitMultiplier(emoji: string | RegExp, multiplier: number): EmojiMeaning {
         return new EmojiMeaning(
             emoji,
             (ctx) => {
@@ -81,65 +81,27 @@ export class EmojiMeaning {
 }
 
 const emojiMeanings: EmojiMeaning[] = [
-    // All the regional indicators and add held keys
-    // ...Array.from({ length: 26 }, (_, i) => {
-    //     const letter = String.fromCodePoint(0x1F1E6 + i); // Regional indicator symbols A-Z
-    //     return EmojiMeaning.holdKey(letter, String.fromCharCode(65 + i)); // A-Z keys
-    // }),
-    // Regional indicators A-Z
-    ...Array.from({ length: 26 }, (_, i) => {
-        const key = String.fromCharCode(65 + i); // A-Z keys
-        return [
-            EmojiMeaning.holdKey(`${key.toLowerCase()}`, key),
-            EmojiMeaning.holdKey(`${key.toLowerCase()}_1`, key)
-        ];
-    }).flat(),
-    
     // leftwards_arrow_with_hook is enter
     EmojiMeaning.holdKey("leftwards_arrow_with_hook", "Enter"),
-    EmojiMeaning.holdKey("tw_leftwards_arrow_with_hook", "Enter"),
-    // arrow_right_hook is tab
     EmojiMeaning.holdKey("arrow_right_hook", "Tab"),
-    EmojiMeaning.holdKey("tw_arrow_right_hook", "Tab"),
 
     // up, down, left, and right arrow keys
     EmojiMeaning.holdKey("arrow_up", "Up"),
-    EmojiMeaning.holdKey("tw_arrow_up", "Up"),
-    
     EmojiMeaning.holdKey("arrow_down", "Down"),
-    EmojiMeaning.holdKey("tw_arrow_down", "Down"),
-
     EmojiMeaning.holdKey("arrow_left", "Left"),
-    EmojiMeaning.holdKey("tw_arrow_left", "Left"),
-
     EmojiMeaning.holdKey("arrow_right", "Right"),
-    EmojiMeaning.holdKey("tw_arrow_right", "Right"),
-
     EmojiMeaning.holdKeys("arrow_upper_left", ["Up", "Left"]),
-    EmojiMeaning.holdKeys("tw_arrow_upper_left", ["Up", "Left"]),
-    
     EmojiMeaning.holdKeys("arrow_upper_right", ["Up", "Right"]),
-    EmojiMeaning.holdKeys("tw_arrow_upper_right", ["Up", "Right"]),
-    
     EmojiMeaning.holdKeys("arrow_lower_left", ["Down", "Left"]),
-    EmojiMeaning.holdKeys("tw_arrow_lower_left", ["Down", "Left"]),
-
     EmojiMeaning.holdKeys("arrow_lower_right", ["Down", "Right"]),
-    EmojiMeaning.holdKeys("tw_arrow_lower_right", ["Down", "Right"]),
-    
     EmojiMeaning.holdKeys("left_right_arrow", ["Left", "Right"]),
-    EmojiMeaning.holdKeys("tw_left_right_arrow", ["Left", "Right"]),
-
     EmojiMeaning.holdKeys("arrow_up_down", ["Up", "Down"]),
-    EmojiMeaning.holdKeys("tw_arrow_up_down", ["Up", "Down"]),
     
     // X means escape
     EmojiMeaning.holdKey("x", "Escape"),
-    EmojiMeaning.holdKey("tw_x", "Escape"),
     
     // Wait multipliers
     EmojiMeaning.waitMultiplier("fast_forward", 6),
-    EmojiMeaning.waitMultiplier("tw_fast_forward", 6),
     
     // All the number symbols are individual frame counts
     EmojiMeaning.wait("one", 0, 1),
@@ -152,20 +114,9 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.wait("eight", 0, 8),
     EmojiMeaning.wait("nine", 0, 9),
     EmojiMeaning.wait("keycap_ten", 0, 10), // WHY IS IT DIFFERENT
-    EmojiMeaning.wait("tw_one", 0, 1),
-    EmojiMeaning.wait("tw_two", 0, 2),
-    EmojiMeaning.wait("tw_three", 0, 3),
-    EmojiMeaning.wait("tw_four", 0, 4),
-    EmojiMeaning.wait("tw_five", 0, 5),
-    EmojiMeaning.wait("tw_six", 0, 6),
-    EmojiMeaning.wait("tw_seven", 0, 7),
-    EmojiMeaning.wait("tw_eight", 0, 8),
-    EmojiMeaning.wait("tw_nine", 0, 9),
-    EmojiMeaning.wait("tw_keycap_ten", 0, 10), // WHY IS IT DIFFERENT
 
     EmojiMeaning.wait("sixseven", 0, 67), // why not?
     EmojiMeaning.wait("100", 0, 100), // why not?
-    EmojiMeaning.wait("tw_100", 0, 100), // why not?
 
     // Clock emojis are seconds, e.g. 1 o'clock is 1 second, 1:30 is 1.5 seconds, etc
     EmojiMeaning.wait("clock1", 1, 0),
@@ -193,31 +144,20 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.wait("clock12", 12, 0),
     EmojiMeaning.wait("clock1230", 0.5, 0),
 
+    ...Array.from({ length: 26 }, (_, i) => {
+        const key = String.fromCharCode(65 + i);
 
-    EmojiMeaning.wait("tw_clock1", 1, 0),
-    EmojiMeaning.wait("tw_clock130", 1.5, 0),
-    EmojiMeaning.wait("tw_clock2", 2, 0),
-    EmojiMeaning.wait("tw_clock230", 2.5, 0),
-    EmojiMeaning.wait("tw_clock3", 3, 0),
-    EmojiMeaning.wait("tw_clock330", 3.5, 0),
-    EmojiMeaning.wait("tw_clock4", 4, 0),
-    EmojiMeaning.wait("tw_clock430", 4.5, 0),
-    EmojiMeaning.wait("tw_clock5", 5, 0),
-    EmojiMeaning.wait("tw_clock530", 5.5, 0),
-    EmojiMeaning.wait("tw_clock6", 6, 0),
-    EmojiMeaning.wait("tw_clock630", 6.5, 0),
-    EmojiMeaning.wait("tw_clock7", 7, 0),
-    EmojiMeaning.wait("tw_clock730", 7.5, 0),
-    EmojiMeaning.wait("tw_clock8", 8, 0),
-    EmojiMeaning.wait("tw_clock830", 8.5, 0),
-    EmojiMeaning.wait("tw_clock9", 9, 0),
-    EmojiMeaning.wait("tw_clock930", 9.5, 0),
-    EmojiMeaning.wait("tw_clock10", 10, 0),
-    EmojiMeaning.wait("tw_clock1030", 10.5, 0),
-    EmojiMeaning.wait("tw_clock11", 11, 0),
-    EmojiMeaning.wait("tw_clock1130", 11.5, 0),
-    EmojiMeaning.wait("tw_clock12", 12, 0),
-    EmojiMeaning.wait("tw_clock1230", 0.5, 0),
+        // A-Z keys can be in the format :a:, :a_1:, :a_10:, etc.
+        return EmojiMeaning.holdKey(new RegExp(
+            `^:${key.toLowerCase()}(_\\d+)?$`
+        ), key)
+    }),
+    
+    // Miscellaneous best-effort matching
+
+    EmojiMeaning.holdKey(/esc/, "Escape"),
+    EmojiMeaning.holdKey(/enter/, "Enter"),
+    EmojiMeaning.holdKey(/tab/, "Tab"),
 ];
 
 /**
@@ -242,7 +182,37 @@ const keyEmojis: { [key: string]: string } = Object.fromEntries([
 ]);
 
 export function findEmojiMeaning(name: string | null): EmojiMeaning | null {
-    return emojiMeanings.find(m => m.emoji === name) ?? null;
+    if(name === null) {
+        return null;
+    }
+
+    if(name.match(/^:.+:$/)) {
+        // probably won't happen, but just to normalize
+        name = name.substring(1, name.length - 1);
+    }
+
+    name = name.toLowerCase();
+    
+    if(name.startsWith("tw_")) {
+        name = name.substring(3);
+    }
+    
+    const explicitMeaning = emojiMeanings.find(m => {
+        if(m.emoji instanceof RegExp) {
+            return name!.match(m.emoji);
+        }
+        return m.emoji === name;
+    });
+
+    if(explicitMeaning) return explicitMeaning;
+
+    // Best-effort mapping for numbers
+    if(!isNaN(Number(name))) {
+        const frames = Math.floor(Number(name));
+        return EmojiMeaning.wait(name, 0, frames);
+    }
+
+    return null;
 }
 
 export function getEmojiForKey(key: string): string | null {
