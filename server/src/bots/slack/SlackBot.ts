@@ -63,7 +63,7 @@ export class SlackBot extends Bot {
                     type: "header",
                     text: {
                         type: "plain_text",
-                        text: headers[0]
+                        text: headers[1]
                     }
                 };
             }
@@ -72,7 +72,7 @@ export class SlackBot extends Bot {
             if(smallText) {
                 newBlock = {
                     type: "markdown",
-                    text: `*${smallText[0]}*`
+                    text: `*${smallText[1]}*`
                 }
             }
             
