@@ -6,6 +6,7 @@ import { ChangeRoomResult, EventUser } from "../../EventRecorder";
 import { debounce } from "../../utils";
 import { CassetteCollectedEvent, ChangeRoomEvent, CompleteChapterEvent, HeartCollectedEvent, HeartColor, StrawberryCollectedEvent } from "../../CelesteSocket";
 import { App } from "@slack/bolt";
+import { KnownBlock } from "@slack/types";
 
 export class SlackBot extends Bot {
     private client: App;
@@ -39,6 +40,65 @@ export class SlackBot extends Bot {
         //     channel: config.CHANNEL_ID,
         //     topic: `See the info canvas!   ${description}`
         // });
+    }
+
+    /**
+     * Converts discord-like markdown to Slack blocks.  
+     * Because headings don't work in Slack blocks, we split the markdown into separate blocks.
+     * - Content like "# heading", "## heading 2", "### heading 3" become heading blocks
+     *   (slack only supports one heading size)
+     * - Content like "-# note" become a context block with italic text (slack doesn't support
+     *   small headings / subscript)
+     */
+    private markToBlocks(markdown: string): KnownBlock[] {
+        const lines = markdown.split("\n");
+        let blocks: KnownBlock[] = [];
+        
+        let currentMark = "";
+        for(const line of lines) {
+            let newBlock: KnownBlock | null = null;
+            const headers = line.match(/^#+ (.*)$/);
+            if(headers) {
+                newBlock = {
+                    type: "header",
+                    text: {
+                        type: "plain_text",
+                        text: headers[0]
+                    }
+                };
+            }
+            
+            const smallText = line.match(/^-# (.*)$/);
+            if(smallText) {
+                newBlock = {
+                    type: "markdown",
+                    text: `*${smallText[0]}*`
+                }
+            }
+            
+            if(newBlock !== null) {
+                if(currentMark.trim() !== "") {
+                    blocks.push({
+                        type: "markdown",
+                        text: currentMark
+                    });
+                    currentMark = "";
+                }
+                
+                blocks.push(newBlock);
+            } else {
+                currentMark += line + "\n";
+            }
+        }
+
+        if(currentMark.trim() !== "") {
+            blocks.push({
+                type: "markdown",
+                text: currentMark
+            });
+        }
+        
+        return blocks;
     }
 
     private async sendToChannel(options: {
@@ -138,10 +198,7 @@ sorry about this! slack is funky and not giving proper error messages in this ca
                         },
                         alt_text: "Celeste screenshot"
                     })) : [],
-                    {
-                        type: "markdown",
-                        text: options.content
-                    }
+                    ...this.markToBlocks(options.content)
                 ]
             });
 
