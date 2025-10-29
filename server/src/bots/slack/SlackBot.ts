@@ -39,14 +39,6 @@ export class SlackBot extends Bot {
         //     channel: config.CHANNEL_ID,
         //     topic: `See the info canvas!   ${description}`
         // });
-
-        await this.client.client.users.profile.set({
-            profile: {
-                status_text: `See the info canvas!   ${description}`,
-                status_emoji: ":celeste:",
-                status_expiration: 0
-            }
-        });
     }
 
     private async sendToChannel(options: {
