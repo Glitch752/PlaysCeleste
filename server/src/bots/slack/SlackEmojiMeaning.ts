@@ -31,7 +31,7 @@ export class ApplyContext {
         } else {
             result += `${formatList(Array.from(this.keysHeld))} held.`;
         }
-        result += " Slack images take a while to upload, so this is pretty slow :c";
+        result += " (slack uploads are slow though :c)";
         return result;
     }
 }
@@ -96,6 +96,13 @@ const emojiMeanings: EmojiMeaning[] = [
     EmojiMeaning.holdKeys("arrow_lower_right", ["Down", "Right"]),
     EmojiMeaning.holdKeys("left_right_arrow", ["Left", "Right"]),
     EmojiMeaning.holdKeys("arrow_up_down", ["Up", "Down"]),
+
+    // upvote/upvoteN and downvote/downvoteN also work for directions
+    // and, y'know, just in case someone tries to use a leftvote or rightvote, let them have their fun
+    EmojiMeaning.holdKey(/^upvote(_\d+)?$/, "Up"),
+    EmojiMeaning.holdKey(/^downvote(_\d+)?$/, "Down"),
+    EmojiMeaning.holdKey(/^leftvote(_\d+)?$/, "Left"),
+    EmojiMeaning.holdKey(/^rightvote(_\d+)?$/, "Right"),
     
     // X means escape
     EmojiMeaning.holdKey("x", "Escape"),

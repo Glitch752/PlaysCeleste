@@ -34,11 +34,19 @@ export class SlackBot extends Bot {
     }
     
     public async onDescriptionChange(description: string) {
-        // TODO: Figure out how to do this w/o sending a funky message
+        // If only there was a way to do this w/o sending a funky message :/
         // await this.client.client.conversations.setTopic({
         //     channel: config.CHANNEL_ID,
         //     topic: `See the info canvas!   ${description}`
         // });
+
+        await this.client.client.users.profile.set({
+            profile: {
+                status_text: `See the info canvas!   ${description}`,
+                status_emoji: ":celeste:",
+                status_expiration: 0
+            }
+        });
     }
 
     private async sendToChannel(options: {
@@ -65,7 +73,7 @@ export class SlackBot extends Bot {
                 // WE NEED TO POLL FOR THIS?? Who at slack came up with this shit 🥀
 
                 let fileExists = false;
-                for(let i = 0; i < 25; i++) {
+                for(let i = 0; i < 30; i++) {
                     await new Promise((resolve) => setTimeout(resolve, 500));
                     const info = await this.client.client.files.info({
                         file: id
@@ -79,11 +87,33 @@ export class SlackBot extends Bot {
 
                 if(!fileExists) {
                     console.error("File upload failed");
-                    return null;
+
+                    this.client.client.chat.postMessage({
+                        channel: config.CHANNEL_ID,
+                        markdown_text: `File upload failed... slack is probably rate limiting us :c
+Will try again in 30s! who knows if this logic actually works because i sure didn't test it
+
+sorry about this! slack is funky and not giving proper error messages in this case`
+                    });
+
+                    try {
+                        await this.client.client.files.delete({
+                            file: id
+                        });
+                    } catch(e) {
+                        console.error("Error deleting file:", e);
+                    }
+
+                    // lmaoo
+                    return new Promise((resolve) => {
+                        setTimeout(async () => {
+                            const retryResult = await this.sendToChannel(options);
+                            resolve(retryResult);
+                        }, 30_000);
+                    });
                 }
 
                 fileIDs.push(id);
-                console.log(fileIDs);
             }
         }
 
@@ -117,11 +147,8 @@ export class SlackBot extends Bot {
                         alt_text: "Celeste screenshot"
                     })) : [],
                     {
-                        type: "section",
-                        text: {
-                            type: "mrkdwn",
-                            text: options.content
-                        }
+                        type: "markdown",
+                        text: options.content
                     }
                 ]
             });
@@ -220,13 +247,6 @@ export class SlackBot extends Bot {
         });
 
         this.client.event("reaction_added", async ({ event }) => {
-            try {
-                console.log(`Reaction added: ${event.reaction} to message: ${event.item.ts}`);
-                // Respond to the reaction (could be sending a message or performing an action)
-            } catch (error) {
-                console.error('Error handling reaction:', error);
-            }
-
             const emoji = event.reaction;
             if(event.item.ts === this.gameplayMessageID) {
                 if(["information_source", "tw_information_source"].includes(emoji)) {
