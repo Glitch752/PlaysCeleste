@@ -71,9 +71,14 @@ export class SlackBot extends Bot {
             const smallText = line.match(/^-# (.*)$/);
             if(smallText) {
                 newBlock = {
-                    type: "markdown",
-                    text: `*${smallText[1]}*`
-                }
+                    type: "context",
+                    elements: [
+                        {
+                            type: "mrkdwn",
+                            text: `_${smallText[1]}_`
+                        }
+                    ]
+                };
             }
             
             if(newBlock !== null) {
